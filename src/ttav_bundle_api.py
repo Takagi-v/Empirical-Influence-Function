@@ -17,6 +17,7 @@ from src.export_ttav_bundle import build_bundle_payload, infer_sample_id, upload
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CORR_RESULTS_DIR = REPO_ROOT / "correlation_matching_results"
 EIF_BUNDLE_CACHE_ROOT = REPO_ROOT / "ttav_bundles"
+PREGENERATED_REAL_BUNDLE_ROOT = REPO_ROOT / "ttav_bundles_real"
 PREPARE_STATUS_LOCK = Lock()
 PREPARE_STATUS: dict[str, dict] = {}
 
@@ -58,6 +59,16 @@ def _cache_dir(sample_id: str, explicit_path: str | None = None) -> Path:
 
 def _cache_payload_path(sample_id: str, explicit_path: str | None = None) -> Path:
     return _cache_dir(sample_id, explicit_path) / "bundle_payload.json"
+
+
+def _resolve_cache_payload_path(sample_id: str, explicit_path: str | None = None) -> Path:
+    payload_path = _cache_payload_path(sample_id, explicit_path)
+    if not payload_path.exists() and not explicit_path:
+        pregenerated_path = PREGENERATED_REAL_BUNDLE_ROOT / sample_id / "bundle_payload.json"
+        if pregenerated_path.exists():
+            print(f"[prepare] sampleId={sample_id} cache=pregenerated_real_bundle", flush=True)
+            return pregenerated_path
+    return payload_path
 
 
 def write_local_bundle_cache(sample_id: str, payload: dict, explicit_path: str | None = None):
@@ -116,7 +127,7 @@ def write_local_bundle_cache(sample_id: str, payload: dict, explicit_path: str |
 
 
 def load_local_bundle_cache(sample_id: str, explicit_path: str | None = None) -> dict:
-    payload_path = _cache_payload_path(sample_id, explicit_path)
+    payload_path = _resolve_cache_payload_path(sample_id, explicit_path)
     return json.loads(payload_path.read_text(encoding="utf-8"))
 
 
@@ -294,11 +305,11 @@ class TTAVBundleRequestHandler(BaseHTTPRequestHandler):
 
         try:
             _set_prepare_status(resolved_sample_id, "checking_cache", "Checking EIF local bundle cache", active=True)
-            payload_path = _cache_payload_path(resolved_sample_id, explicit_cache_path)
+            payload_path = _resolve_cache_payload_path(resolved_sample_id, explicit_cache_path)
             cache_hit = False
 
             if payload_path.exists():
-                cached_payload = load_local_bundle_cache(resolved_sample_id, explicit_cache_path)
+                cached_payload = json.loads(payload_path.read_text(encoding="utf-8"))
                 if _payload_matches_request(cached_payload, bundle_mode, embedding_type, model_path):
                     payload = cached_payload
                     cache_hit = True

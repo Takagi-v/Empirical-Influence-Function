@@ -125,6 +125,10 @@ def load_model_and_tokenizer(
         "torch_dtype": dtype,
         "trust_remote_code": True,
         "local_files_only": True,
+        # Stream weights shard-by-shard instead of materializing a full extra
+        # copy during load. Cuts peak host RAM roughly in half — critical on
+        # this 7GB-RAM box where loading otherwise OOM-kills the API.
+        "low_cpu_mem_usage": True,
     }
     if torch.cuda.is_available():
         model_kwargs["device_map"] = "auto"

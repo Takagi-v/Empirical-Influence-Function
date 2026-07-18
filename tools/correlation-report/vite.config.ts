@@ -201,6 +201,24 @@ function experimentDataPlugin(): Plugin {
   }
 }
 
+// Reverse-proxy /api/* to the EIF bundle API so the frontend can call it
+// same-origin (see getDefaultEifApiUrl). Works for both `vite` (dev) and
+// `vite preview`. In VS Code forwarded-localhost setups this means you only
+// need to forward the vite port — no separate 8766 forward, no port mismatch.
+const EIF_API_PROXY = {
+  '/api': {
+    target: 'http://127.0.0.1:8766',
+    changeOrigin: true,
+  },
+}
+
+// Pin a dedicated port so this app never collides with TTAV's vite (5173).
+// strictPort makes vite fail loudly instead of silently drifting to 5174,
+// which was causing "am I on the report or on TTAV?" confusion.
+const EIF_REPORT_PORT = 5273
+
 export default defineConfig({
   plugins: [react(), experimentDataPlugin()],
+  server: { port: EIF_REPORT_PORT, strictPort: true, proxy: EIF_API_PROXY },
+  preview: { port: EIF_REPORT_PORT, strictPort: true, proxy: EIF_API_PROXY },
 })

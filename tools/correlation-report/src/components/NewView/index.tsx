@@ -13,10 +13,11 @@ function getDefaultEifApiUrl(): string {
         return 'http://127.0.0.1:8766/api/prepare-ttav-bundle';
     }
 
-    const protocol = window.location.protocol || 'http:';
-    const hostname = window.location.hostname || '127.0.0.1';
-    const port = hostname === 'localhost' || hostname === '127.0.0.1' ? '8766' : '8765';
-    return `${protocol}//${hostname}:${port}/api/prepare-ttav-bundle`;
+    // Same-origin: the /api/* path is reverse-proxied to the EIF bundle API
+    // (127.0.0.1:8766) by the page server (vite dev/preview proxy, or nginx).
+    // Using window.location.origin avoids port-mismatch and mixed-content issues
+    // in VS Code forwarded-localhost and public-nginx setups alike.
+    return `${window.location.origin}/api/prepare-ttav-bundle`;
 }
 
 const DEFAULT_EIF_API_URL = getDefaultEifApiUrl();

@@ -5,7 +5,10 @@ const TTAV_PREFS_KEY = 'eif:ttav-launch-prefs';
 const TTAV_PREPARED_BUNDLES_KEY = 'eif:ttav-prepared-bundles';
 const DEFAULT_TTAV_URL = 'http://1.94.115.154/';
 const DEFAULT_TTAV_CONTENT_PATH_TEMPLATE = '/root/project/Dataset/eif_bundles/{sampleId}';
-const DEFAULT_EIF_BUNDLE_CACHE_TEMPLATE = '/home/yilu/workspace/Empirical-Influence-Function/ttav_bundles/{sampleId}';
+// Empty by default: let the EIF bundle API resolve its own on-server cache
+// directory (ttav_bundles/{sampleId} relative to its repo root) instead of a
+// hardcoded absolute path that only exists on one developer's machine.
+const DEFAULT_EIF_BUNDLE_CACHE_TEMPLATE = '';
 const DEFAULT_TTAV_METHOD = 'TimeVis';
 const DEFAULT_TTAV_VIS_ID = '1';
 function getDefaultEifApiUrl(): string {

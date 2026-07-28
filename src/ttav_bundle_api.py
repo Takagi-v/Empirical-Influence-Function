@@ -63,11 +63,27 @@ def _cache_payload_path(sample_id: str, explicit_path: str | None = None) -> Pat
 
 def _resolve_cache_payload_path(sample_id: str, explicit_path: str | None = None) -> Path:
     payload_path = _cache_payload_path(sample_id, explicit_path)
-    if not payload_path.exists() and not explicit_path:
-        pregenerated_path = PREGENERATED_REAL_BUNDLE_ROOT / sample_id / "bundle_payload.json"
-        if pregenerated_path.exists():
-            print(f"[prepare] sampleId={sample_id} cache=pregenerated_real_bundle", flush=True)
-            return pregenerated_path
+    if payload_path.exists():
+        return payload_path
+
+    # A caller-supplied explicit_path (from the frontend's "EIF Bundle Cache
+    # Path" field / localStorage) can go stale or point at a path that only
+    # ever existed on a different machine. Rather than treat that as a hard
+    # cache miss and fall through to a live model load -- which requires
+    # loading a ~7GB checkpoint on this 7.1GB-RAM box and reliably OOMs, see
+    # HANDOFF_2026-07-13_EIF_TTAV_OOM.md -- fall back to the server's own
+    # default cache locations first.
+    if explicit_path:
+        default_path = _cache_payload_path(sample_id, None)
+        if default_path.exists():
+            print(f"[prepare] sampleId={sample_id} cache=default_fallback (explicit path missing: {explicit_path})", flush=True)
+            return default_path
+
+    pregenerated_path = PREGENERATED_REAL_BUNDLE_ROOT / sample_id / "bundle_payload.json"
+    if pregenerated_path.exists():
+        print(f"[prepare] sampleId={sample_id} cache=pregenerated_real_bundle", flush=True)
+        return pregenerated_path
+
     return payload_path
 
 

@@ -1,0 +1,41 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/kubernetes/Kubernetes/vendor/github.com/json-iterator/go Below is the code repository: github.com/kubernetes/Kubernetes/ Below is the imported package path "bytes"; "io" The receiver struct definitions of the function is type Encoder struct {
+	stream *Stream
+}
+
+// Methods:
+- func (adapter *Encoder) Encode(val *ast.InterfaceType) error
+- func (adapter *Encoder) SetIndent((prefix string, indent string))
+- func (adapter *Encoder) SetEscapeHTML(escapeHTML bool)
+ The parameter struct definition or not exist of the function is (prefix string, indent string) The return value struct definitions or not exist of the function is not exist The code snippets before the function is func (adapter *Decoder) Buffered() io.Reader {
+	remaining := adapter.iter.buf[adapter.iter.head:adapter.iter.tail]
+	return bytes.NewReader(remaining)
+}
+
+func (adapter *Decoder) UseNumber() {
+	cfg := adapter.iter.cfg.configBeforeFrozen
+	cfg.UseNumber = true
+	adapter.iter.cfg = cfg.frozeWithCacheReuse(adapter.iter.cfg.extraExtensions)
+}
+
+func (adapter *Decoder) DisallowUnknownFields() {
+	cfg := adapter.iter.cfg.configBeforeFrozen
+	cfg.DisallowUnknownFields = true
+	adapter.iter.cfg = cfg.frozeWithCacheReuse(adapter.iter.cfg.extraExtensions)
+}
+
+func NewEncoder(writer io.Writer) *Encoder {
+	return ConfigDefault.NewEncoder(writer)
+}
+
+func (adapter *Encoder) Encode(val interface{}) error {
+	adapter.stream.WriteVal(val)
+	adapter.stream.WriteRaw("\
+")
+	adapter.stream.Flush()
+	return adapter.stream.Error
+} And here is the function you are asked to complete func (adapter *Encoder) SetIndent((prefix string, indent string))
+func (adapter *Encoder) SetIndent(prefix, indent string) { <MID> } Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

@@ -1,0 +1,2 @@
+			if err := os.MkdirAll(dir, 0o755); err != nil && !os.IsExist(err) {
+				d.logger.Error

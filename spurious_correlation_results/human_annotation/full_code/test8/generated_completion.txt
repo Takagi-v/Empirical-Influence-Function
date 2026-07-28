@@ -1,0 +1,2 @@
+	result, _ := tmpl.New("").Apply(s, env)
+	return result

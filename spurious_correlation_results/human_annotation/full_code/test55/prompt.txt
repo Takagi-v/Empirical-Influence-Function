@@ -1,0 +1,33 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/etcd-io/etcd/etcdctl/ctlv3/command Below is the code repository: github.com/etcd-io/etcd/ Below is the imported package path "bufio"; "context"; "fmt"; "os"; "strconv"; "strings"; "github.com/spf13/cobra"; "go.etcd.io/etcd/api/v3/etcdserverpb"; "go.etcd.io/etcd/client/v3"; "go.etcd.io/etcd/pkg/v3/cobrautl" The receiver struct definitions of the function is not exist The parameter struct definition or not exist of the function is not exist The return value struct definitions or not exist of the function is *cobra.Command The code snippets before the function is not exist And here is the function you are asked to complete func NewTxnCommand() *cobra.Command
+func NewTxnCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "txn [options]",
+		Short: "Txn processes all the requests in one transaction",
+		Long: `Txn reads multiple etcd requests from standard input and applies them as a single atomic transaction.
+ <MID> 
+Example interactive stdin usage:
+
+---
+etcdctl txn -i
+# compares:
+mod("key1") > "0"
+
+# success requests (get, put, delete):
+put key1 "overwrote-key1"
+
+# failure requests (get, put, delete):
+put key1 "created-key1"
+put key2 "some extra key"
+---
+
+Refer to https://github.com/etcd-io/etcd/blob/main/etcdctl/README.md#txn-options.`,
+		Run:     txnCommandFunc,
+		GroupID: groupKVID,
+	}
+	cmd.Flags().BoolVarP(&txnInteractive, "interactive", "i", false, "Input transaction in interactive mode")
+	return cmd
+} Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

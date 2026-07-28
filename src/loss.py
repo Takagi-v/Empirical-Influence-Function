@@ -467,6 +467,23 @@ def _normalize_alti_importance(
     return scores
 
 
+
+def _unwrap_qwen_decoder(model):
+    """Return the decoder stack that owns .layers (unwrap Peft if needed)."""
+    m = model
+    if hasattr(m, "get_base_model"):
+        try:
+            m = m.get_base_model()
+        except Exception:
+            pass
+    if hasattr(m, "model") and hasattr(m.model, "layers"):
+        return m.model
+    if hasattr(m, "layers"):
+        return m
+    raise ValueError(
+        f"Expected a Qwen-style model.model.layers stack; got {type(model).__name__}."
+    )
+
 @torch.no_grad()
 def _compute_qwen_alti_layer_matrix(
     model,
@@ -485,10 +502,8 @@ def _compute_qwen_alti_layer_matrix(
     FFN blocks are position-wise, so they do not introduce token mixing; this
     matrix tracks the attention block's mixing in the residual stream.
     """
-    if not hasattr(model, "model") or not hasattr(model.model, "layers"):
-        raise ValueError("compute_alti_saliency_vector currently expects a Qwen-style model.model.layers stack.")
-
-    layer = model.model.layers[layer_idx]
+    decoder = _unwrap_qwen_decoder(model)
+    layer = decoder.layers[layer_idx]
     self_attn = layer.self_attn
 
     device = self_attn.v_proj.weight.device
@@ -568,10 +583,8 @@ def _compute_qwen_alti_layer_relevance(
     the full rollout. This is the differentiable counterpart used for pair-level
     ALTI gradients.
     """
-    if not hasattr(model, "model") or not hasattr(model.model, "layers"):
-        raise ValueError("compute_alti_correlation_gradient currently expects a Qwen-style model.model.layers stack.")
-
-    layer = model.model.layers[layer_idx]
+    decoder = _unwrap_qwen_decoder(model)
+    layer = decoder.layers[layer_idx]
     self_attn = layer.self_attn
 
     device = self_attn.v_proj.weight.device
@@ -657,10 +670,8 @@ def _compute_qwen_alti_layer_target_relevance(
     This is the memory-critical fast path for last-layer-only matching: the
     final score needs only the target row, not all query rows in the sequence.
     """
-    if not hasattr(model, "model") or not hasattr(model.model, "layers"):
-        raise ValueError("compute_alti_correlation_gradient currently expects a Qwen-style model.model.layers stack.")
-
-    layer = model.model.layers[layer_idx]
+    decoder = _unwrap_qwen_decoder(model)
+    layer = decoder.layers[layer_idx]
     self_attn = layer.self_attn
 
     device = self_attn.v_proj.weight.device
@@ -738,8 +749,7 @@ def compute_alti_last_layer_source_vectors(
         return {}
     if targets[0] <= 0:
         raise ValueError("target indices must be > 0 because they denote next-token positions.")
-    if not hasattr(model, "model") or not hasattr(model.model, "layers"):
-        raise ValueError("ALTI source vectors currently expect a Qwen-style model.model.layers stack.")
+    _unwrap_qwen_decoder(model)
 
     max_target = max(targets)
     model.eval()
@@ -769,7 +779,7 @@ def compute_alti_last_layer_source_vectors(
         raise RuntimeError("Encountered None attention tensor; use eager attention when computing ALTI.")
 
     layer_idx = len(attentions) - 1
-    layer = model.model.layers[layer_idx]
+    layer = _unwrap_qwen_decoder(model).layers[layer_idx]
     self_attn = layer.self_attn
     device = self_attn.v_proj.weight.device
     hidden = hidden_states[layer_idx].to(device)
@@ -976,7 +986,11 @@ def compute_alti_saliency_vectors(
 
 
 def _selected_layer_start_from_filter(model, param_filter_fn) -> int:
-    if param_filter_fn is None or not hasattr(model, "model") or not hasattr(model.model, "layers"):
+    if param_filter_fn is None:
+        return 0
+    try:
+        _unwrap_qwen_decoder(model)
+    except ValueError:
         return 0
 
     selected_layers = []
@@ -990,7 +1004,11 @@ def _selected_layer_start_from_filter(model, param_filter_fn) -> int:
 
 
 def _selected_layers_from_filter(model, param_filter_fn) -> list[int]:
-    if param_filter_fn is None or not hasattr(model, "model") or not hasattr(model.model, "layers"):
+    if param_filter_fn is None:
+        return []
+    try:
+        _unwrap_qwen_decoder(model)
+    except ValueError:
         return []
 
     selected_layers = set()
@@ -1001,6 +1019,235 @@ def _selected_layers_from_filter(model, param_filter_fn) -> list[int]:
                 selected_layers.add(int(match.group(1)))
 
     return sorted(selected_layers)
+
+
+def compute_alti_match_and_probe_gradients(
+    model,
+    batch,
+    target_idx_in_seq: int,
+    source_idx_in_seq: int,
+    param_filter_fn,
+    *,
+    device=None,
+    p: int = 1,
+    chunk_size: int = 8,
+    return_score: bool = False,
+    probe_eps: float = 1e-8,
+):
+    """Compute ∇_θ ALTI(s→t) and viz-style ∇_θ (-log(ALTI+ε)).
+
+    Uses two separate forwards (no retain_graph) to cut peak memory.
+    Prefer passing a last-N LoRA ``param_filter_fn`` so bank/probe/∇C share one
+    subspace. If the filter still spans many layers, this falls back to a
+    last-layer ALTI path (earlier-layer slots zero) to avoid OOM on 24GB GPUs.
+    """
+    if torch.is_inference_mode_enabled():
+        raise RuntimeError("Disable torch.inference_mode() before calling this function.")
+    if target_idx_in_seq <= 0:
+        raise ValueError("target_idx_in_seq must be > 0.")
+    if source_idx_in_seq < 0 or source_idx_in_seq >= target_idx_in_seq:
+        raise ValueError(
+            f"source_idx_in_seq={source_idx_in_seq} must be in [0, {target_idx_in_seq})."
+        )
+
+    def _flat_grad(objective: str):
+        model.eval()
+        model.zero_grad(set_to_none=True)
+
+        selected_layers = _selected_layers_from_filter(model, param_filter_fn)
+        try:
+            last_layer_idx = len(_unwrap_qwen_decoder(model).layers) - 1
+        except ValueError:
+            last_layer_idx = max(selected_layers) if selected_layers else 0
+
+        # Multi-layer LoRA filters must not keep a full-graph forward (OOM on 24GB).
+        # Match viz-style last-layer ALTI grads; pad earlier LoRA slots with zeros.
+        use_last_layer_path = (
+            not selected_layers
+            or selected_layers == [last_layer_idx]
+            or len(selected_layers) > 1
+        )
+        restrict_grad_to_last = bool(use_last_layer_path and len(selected_layers) > 1)
+
+        target_params = []
+        original_flags = []
+        for name, param in model.named_parameters():
+            selected = param_filter_fn is None or param_filter_fn(name, param)
+            original_flags.append((param, param.requires_grad))
+            if selected:
+                target_params.append(param)
+                if restrict_grad_to_last:
+                    match = re.search(r"(?:^|\.)layers\.(\d+)\.", name)
+                    layer_i = int(match.group(1)) if match else None
+                    param.requires_grad_(layer_i == last_layer_idx)
+                else:
+                    param.requires_grad_(True)
+            else:
+                param.requires_grad_(False)
+
+        if not target_params:
+            for param, flag in original_flags:
+                param.requires_grad_(flag)
+            raise RuntimeError(
+                "compute_alti_match_and_probe_gradients: no parameters matched param_filter_fn."
+            )
+
+        local_device = device or getattr(model, "device", None)
+        if local_device is None:
+            local_device = target_params[0].device
+        input_ids = batch["input_ids"][:, :target_idx_in_seq].to(local_device)
+        inputs = {"input_ids": input_ids}
+        if "attention_mask" in batch:
+            inputs["attention_mask"] = batch["attention_mask"][:, :target_idx_in_seq].to(local_device)
+
+        try:
+            with torch.enable_grad():
+                outputs = model(
+                    **inputs,
+                    output_hidden_states=True,
+                    output_attentions=True,
+                    use_cache=False,
+                    return_dict=True,
+                )
+
+                hidden_states = list(outputs.hidden_states or [])
+                attentions = list(outputs.attentions or [])
+                del outputs
+                if not hidden_states or not attentions:
+                    raise RuntimeError(
+                        "Model did not return hidden_states/attentions. "
+                        "Use eager attention for ALTI gradients."
+                    )
+
+                seq_len = input_ids.size(1)
+                relevance = torch.zeros(seq_len, dtype=torch.float32, device=local_device)
+                relevance[source_idx_in_seq] = 1.0
+                last_layer_idx = len(attentions) - 1
+
+                if use_last_layer_path:
+                    for layer_idx in range(last_layer_idx):
+                        if attentions[layer_idx] is None:
+                            raise RuntimeError(
+                                "Encountered None attention tensor; use eager attention for ALTI gradients."
+                            )
+                        with torch.no_grad():
+                            relevance = _compute_qwen_alti_layer_relevance(
+                                model,
+                                layer_idx,
+                                hidden_states[layer_idx].detach(),
+                                attentions[layer_idx].detach(),
+                                relevance.detach(),
+                                p=p,
+                                chunk_size=chunk_size,
+                            ).detach()
+                        hidden_states[layer_idx] = None
+                        attentions[layer_idx] = None
+
+                    if attentions[last_layer_idx] is None:
+                        raise RuntimeError(
+                            "Encountered None attention tensor; use eager attention for ALTI gradients."
+                        )
+
+                    alti_score = _compute_qwen_alti_layer_target_relevance(
+                        model,
+                        last_layer_idx,
+                        hidden_states[last_layer_idx],
+                        attentions[last_layer_idx],
+                        relevance,
+                        target_idx_in_seq - 1,
+                        p=p,
+                    )
+                    hidden_states[last_layer_idx] = None
+                    attentions[last_layer_idx] = None
+                else:
+                    grad_start_layer = _selected_layer_start_from_filter(model, param_filter_fn)
+                    for layer_idx in range(len(attentions)):
+                        if attentions[layer_idx] is None:
+                            raise RuntimeError(
+                                "Encountered None attention tensor; use eager attention for ALTI gradients."
+                            )
+                        if layer_idx < grad_start_layer:
+                            with torch.no_grad():
+                                relevance = _compute_qwen_alti_layer_relevance(
+                                    model,
+                                    layer_idx,
+                                    hidden_states[layer_idx].detach(),
+                                    attentions[layer_idx].detach(),
+                                    relevance.detach(),
+                                    p=p,
+                                    chunk_size=chunk_size,
+                                ).detach()
+                        else:
+                            relevance = _compute_qwen_alti_layer_relevance(
+                                model,
+                                layer_idx,
+                                hidden_states[layer_idx],
+                                attentions[layer_idx],
+                                relevance,
+                                p=p,
+                                chunk_size=chunk_size,
+                            )
+                        hidden_states[layer_idx] = None
+                        attentions[layer_idx] = None
+                    alti_score = relevance[target_idx_in_seq - 1]
+
+                if objective == "probe":
+                    loss = -torch.log(alti_score.clamp_min(0.0) + float(probe_eps))
+                else:
+                    loss = alti_score
+
+                # Only differentiate w.r.t. params that currently require grad.
+                # Earlier-layer LoRA slots stay in the flat vector as zeros so the
+                # length still matches the full-LoRA bank.
+                grad_params = [param for param in target_params if param.requires_grad]
+                if not grad_params:
+                    raise RuntimeError(
+                        "compute_alti_match_and_probe_gradients: no requires_grad "
+                        "parameters left after last-layer restriction."
+                    )
+                if not torch.is_tensor(loss) or not loss.requires_grad:
+                    raise RuntimeError(
+                        "ALTI match/probe score is not connected to the graph "
+                        "(loss.requires_grad=False). Check eager attention and "
+                        "last-layer LoRA requires_grad settings."
+                    )
+                grads = torch.autograd.grad(
+                    loss,
+                    grad_params,
+                    create_graph=False,
+                    retain_graph=False,
+                    allow_unused=True,
+                )
+                grad_map = {
+                    id(param): g for param, g in zip(grad_params, grads)
+                }
+                del grads
+
+            flat = torch.cat([
+                (
+                    grad_map[id(param)].reshape(-1).detach().cpu().float()
+                    if id(param) in grad_map and grad_map[id(param)] is not None
+                    else torch.zeros(param.numel(), dtype=torch.float32)
+                )
+                for param in target_params
+            ])
+            score_value = float(alti_score.detach().cpu().item())
+            del hidden_states, attentions, relevance, grad_map
+            return flat, score_value
+        finally:
+            for param, flag in original_flags:
+                param.requires_grad_(flag)
+            model.zero_grad(set_to_none=True)
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+    flat_match, score_value = _flat_grad("match")
+    flat_probe, _ = _flat_grad("probe")
+
+    if return_score:
+        return flat_match, flat_probe, score_value
+    return flat_match, flat_probe
+
 
 
 def compute_alti_correlation_gradient(
@@ -1014,159 +1261,25 @@ def compute_alti_correlation_gradient(
     p: int = 1,
     chunk_size: int = 8,
     return_score: bool = False,
+    as_probe_loss: bool = False,
+    probe_eps: float = 1e-8,
 ):
-    """
-    Compute a first-order parameter-space feature for one ALTI correlation pair:
-
-        ∇_θ ALTI(source_idx_in_seq -> target_idx_in_seq)
-
-    `target_idx_in_seq` is the token being predicted, so the model runs on
-    prefix [:target_idx_in_seq] and the final query position is
-    target_idx_in_seq - 1.
-    """
-    if torch.is_inference_mode_enabled():
-        raise RuntimeError("Disable torch.inference_mode() before calling this function.")
-    if target_idx_in_seq <= 0:
-        raise ValueError("target_idx_in_seq must be > 0.")
-    if source_idx_in_seq < 0 or source_idx_in_seq >= target_idx_in_seq:
-        raise ValueError(
-            f"source_idx_in_seq={source_idx_in_seq} must be in [0, {target_idx_in_seq})."
-        )
-
-    model.eval()
-    model.zero_grad(set_to_none=True)
-
-    target_params = []
-    original_flags = []
-    for name, param in model.named_parameters():
-        selected = param_filter_fn is None or param_filter_fn(name, param)
-        original_flags.append((param, param.requires_grad))
-        param.requires_grad_(selected)
-        if selected:
-            target_params.append(param)
-
-    if not target_params:
-        for param, flag in original_flags:
-            param.requires_grad_(flag)
-        raise RuntimeError("compute_alti_correlation_gradient: no parameters matched param_filter_fn.")
-
-    device = device or model.device
-    input_ids = batch["input_ids"][:, :target_idx_in_seq].to(device)
-    inputs = {"input_ids": input_ids}
-    if "attention_mask" in batch:
-        inputs["attention_mask"] = batch["attention_mask"][:, :target_idx_in_seq].to(device)
-
-    grad_start_layer = _selected_layer_start_from_filter(model, param_filter_fn)
-    selected_layers = _selected_layers_from_filter(model, param_filter_fn)
-
-    try:
-        with torch.enable_grad():
-            outputs = model(
-                **inputs,
-                output_hidden_states=True,
-                output_attentions=True,
-                use_cache=False,
-                return_dict=True,
-            )
-
-            hidden_states = list(outputs.hidden_states or [])
-            attentions = list(outputs.attentions or [])
-            del outputs
-            if not hidden_states or not attentions:
-                raise RuntimeError(
-                    "Model did not return hidden_states/attentions. Use eager attention for ALTI gradients."
-                )
-
-            seq_len = input_ids.size(1)
-            relevance = torch.zeros(seq_len, dtype=torch.float32, device=device)
-            relevance[source_idx_in_seq] = 1.0
-            last_layer_idx = len(attentions) - 1
-
-            if selected_layers == [last_layer_idx]:
-                for layer_idx in range(last_layer_idx):
-                    if attentions[layer_idx] is None:
-                        raise RuntimeError("Encountered None attention tensor; use eager attention for ALTI gradients.")
-                    with torch.no_grad():
-                        relevance = _compute_qwen_alti_layer_relevance(
-                            model,
-                            layer_idx,
-                            hidden_states[layer_idx].detach(),
-                            attentions[layer_idx].detach(),
-                            relevance.detach(),
-                            p=p,
-                            chunk_size=chunk_size,
-                        ).detach()
-                    hidden_states[layer_idx] = None
-                    attentions[layer_idx] = None
-
-                if attentions[last_layer_idx] is None:
-                    raise RuntimeError("Encountered None attention tensor; use eager attention for ALTI gradients.")
-
-                alti_score = _compute_qwen_alti_layer_target_relevance(
-                    model,
-                    last_layer_idx,
-                    hidden_states[last_layer_idx],
-                    attentions[last_layer_idx],
-                    relevance,
-                    target_idx_in_seq - 1,
-                    p=p,
-                )
-                hidden_states[last_layer_idx] = None
-                attentions[last_layer_idx] = None
-            else:
-                for layer_idx in range(len(attentions)):
-                    if attentions[layer_idx] is None:
-                        raise RuntimeError("Encountered None attention tensor; use eager attention for ALTI gradients.")
-
-                    if layer_idx < grad_start_layer:
-                        with torch.no_grad():
-                            relevance = _compute_qwen_alti_layer_relevance(
-                                model,
-                                layer_idx,
-                                hidden_states[layer_idx].detach(),
-                                attentions[layer_idx].detach(),
-                                relevance.detach(),
-                                p=p,
-                                chunk_size=chunk_size,
-                            ).detach()
-                    else:
-                        relevance = _compute_qwen_alti_layer_relevance(
-                            model,
-                            layer_idx,
-                            hidden_states[layer_idx],
-                            attentions[layer_idx],
-                            relevance,
-                            p=p,
-                            chunk_size=chunk_size,
-                        )
-
-                    hidden_states[layer_idx] = None
-                    attentions[layer_idx] = None
-
-                alti_score = relevance[target_idx_in_seq - 1]
-
-            grads = torch.autograd.grad(
-                alti_score,
-                target_params,
-                create_graph=False,
-                retain_graph=False,
-                allow_unused=True,
-            )
-
-        flat_grad = torch.cat([
-            g.reshape(-1).detach().cpu().float()
-            if g is not None else torch.zeros(p.numel(), dtype=torch.float32)
-            for g, p in zip(grads, target_params)
-        ])
-        score_value = float(alti_score.detach().cpu().item())
-        del hidden_states, attentions, relevance
-
-    finally:
-        for param, flag in original_flags:
-            param.requires_grad_(flag)
-        model.zero_grad(set_to_none=True)
-        torch.cuda.empty_cache()
-
+    """ALTI pair feature: ∇C by default, or viz L_probe = ∇(-log(C+ε)) if as_probe_loss."""
+    out = compute_alti_match_and_probe_gradients(
+        model,
+        batch,
+        target_idx_in_seq,
+        source_idx_in_seq,
+        param_filter_fn,
+        device=device,
+        p=p,
+        chunk_size=chunk_size,
+        return_score=return_score,
+        probe_eps=probe_eps,
+    )
     if return_score:
-        return flat_grad, score_value
-    return flat_grad
+        flat_match, flat_probe, score_value = out
+        return (flat_probe if as_probe_loss else flat_match), score_value
+    flat_match, flat_probe = out
+    return flat_probe if as_probe_loss else flat_match
+

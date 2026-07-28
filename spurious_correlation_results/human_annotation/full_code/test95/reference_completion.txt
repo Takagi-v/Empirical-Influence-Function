@@ -1,0 +1,3 @@
+		return errors.Errorf(
+			"split key is equal to range start key (split_key=%s)",
+			splitRKey)

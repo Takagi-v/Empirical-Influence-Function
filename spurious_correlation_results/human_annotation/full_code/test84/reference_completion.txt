@@ -1,0 +1,4 @@
+		FmtAnnotations(ann),
+	)
+	f.FormatNode(rootAST)
+	formattedRedactableStatementString := f.CloseAndGetString()

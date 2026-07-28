@@ -1,0 +1,2 @@
+			p.addExpectedTokenErr("define field type")
+			return nil

@@ -1,0 +1,238 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/cockroachdb/cockroach/pkg/sql/opt/optgen/lang Below is the code repository: github.com/cockroachdb/cockroach/ Below is the imported package path "bytes"; "fmt"; "io"; "os"; "strconv"; "strings" The receiver struct definitions of the function is type Parser struct {
+	files   []string
+	file    int
+	r       io.Reader
+	s       *Scanner
+	src     SourceLoc
+	saveSrc SourceLoc
+	errors  []error
+
+	// comments accumulates contiguous comments as they are scanned.
+	comments CommentsExpr
+
+	// resolver is invoked to open the input files provided to the parser.
+	resolver FileResolver
+
+	// unscanned is true if the last token was unscanned (i.e. put back to be
+	// reparsed).
+	unscanned bool
+
+	// exprs is tracks top-level expressions (including comments) in order.
+	exprs []Expr
+
+	// exprComments maps expressions to comments.
+	exprComments map[Expr]CommentsExpr
+}
+
+// Methods:
+- func (p *Parser) SetFileResolver(resolver FileResolver)
+- func (p *Parser) Parse() *RootExpr
+- func (p *Parser) Errors() *ast.ArrayType
+- func (p *Parser) Exprs() *ast.ArrayType
+- func (p *Parser) GetComments(e Expr) CommentsExpr
+- func (p *Parser) getComments() CommentsExpr
+- func (p *Parser) setComments((e Expr, comments CommentsExpr))
+- func (p *Parser) hasComments() bool
+- func (p *Parser) appendComments()
+- func (p *Parser) parseRoot() *RootExpr
+- func (p *Parser) parseDefine((comments CommentsExpr, tags TagsExpr, src SourceLoc)) *DefineExpr
+- func (p *Parser) parseDefineField() *DefineFieldExpr
+- func (p *Parser) parseRule((comments CommentsExpr, tags TagsExpr, src SourceLoc)) *RuleExpr
+- func (p *Parser) parseMatch() Expr
+- func (p *Parser) parseReplace() Expr
+- func (p *Parser) parseFuncOrLet() Expr
+- func (p *Parser) parseFunc() Expr
+- func (p *Parser) parseFuncImpl() Expr
+- func (p *Parser) parseFuncName() Expr
+- func (p *Parser) parseLet() Expr
+- func (p *Parser) parseNames() Expr
+- func (p *Parser) parseArg() Expr
+- func (p *Parser) parseBindOrRef() Expr
+- func (p *Parser) parseAnd() Expr
+- func (p *Parser) parseExpr() Expr
+- func (p *Parser) parseNot() Expr
+- func (p *Parser) parseList() Expr
+- func (p *Parser) parseListChild() Expr
+- func (p *Parser) parseRef() *RefExpr
+- func (p *Parser) parseTags() TagsExpr
+- func (p *Parser) parseString() *StringExpr
+- func (p *Parser) parseNumber() *NumberExpr
+- func (p *Parser) peekNextSource() *SourceLoc
+- func (p *Parser) scanToken((expected Token, desc string)) bool
+- func (p *Parser) scan() Token
+- func (p *Parser) scanInternal(skipWhitespace bool) Token
+- func (p *Parser) unscan()
+- func (p *Parser) openScanner() bool
+- func (p *Parser) closeScanner()
+- func (p *Parser) addExpectedTokenErr(desc string)
+- func (p *Parser) addErr(text string)
+- func (p *Parser) tryRecover()
+- func (p *Parser) isDefineIdent() bool
+ The parameter struct definition or not exist of the function is not exist The return value struct definitions or not exist of the function is *DefineFieldExpr The code snippets before the function is func (p *Parser) setComments(e Expr, comments CommentsExpr) {
+	if len(comments) > 0 {
+		p.exprComments[e] = comments
+	}
+}
+
+func (p *Parser) hasComments() bool {
+	return len(p.comments) > 0
+}
+
+func (p *Parser) appendComments() {
+	comments := p.getComments()
+	if len(comments) > 0 {
+		p.exprs = append(p.exprs, &comments)
+	}
+}
+
+func (p *Parser) parseRoot() *RootExpr {
+	rootOp := &RootExpr{}
+
+	// Ensure the scanner has been created over the first file.
+	if p.s == nil {
+		// If no files to parse, then return empty root expression.
+		if len(p.files) == 0 {
+			return rootOp
+		}
+
+		if !p.openScanner() {
+			return nil
+		}
+	}
+
+	for {
+		var tags TagsExpr
+		var comments CommentsExpr
+
+		tok := p.scan()
+		src := p.src
+
+		switch tok {
+		case EOF:
+			return rootOp
+
+		case LBRACKET:
+			p.unscan()
+
+			comments = p.getComments()
+			tags = p.parseTags()
+			if tags == nil {
+				p.tryRecover()
+				break
+			}
+
+			if p.scan() != IDENT {
+				p.unscan()
+
+				rule := p.parseRule(comments, tags, src)
+				if rule == nil {
+					p.tryRecover()
+					break
+				}
+				p.setComments(rule, comments)
+
+				rootOp.Rules = append(rootOp.Rules, rule)
+				p.exprs = append(p.exprs, rule)
+				break
+			}
+
+			fallthrough
+
+		case IDENT:
+			// Only define identifier is allowed at the top level.
+			if !p.isDefineIdent() {
+				p.addExpectedTokenErr("define statement")
+				p.tryRecover()
+				break
+			}
+			// If there was no tag, we need to check for comments.
+			if len(comments) == 0 {
+				comments = p.getComments()
+			}
+
+			p.unscan()
+
+			define := p.parseDefine(comments, tags, src)
+			if define == nil {
+				p.tryRecover()
+				break
+			}
+			p.setComments(define, comments)
+
+			rootOp.Defines = append(rootOp.Defines, define)
+			p.exprs = append(p.exprs, define)
+
+		default:
+			p.addExpectedTokenErr("define statement or rule")
+			p.tryRecover()
+		}
+	}
+}
+
+func (p *Parser) parseDefine(comments CommentsExpr, tags TagsExpr, src SourceLoc) *DefineExpr {
+	if !p.scanToken(IDENT, "define statement") || p.s.Literal() != "define" {
+		return nil
+	}
+
+	if !p.scanToken(IDENT, "define name") {
+		return nil
+	}
+
+	name := p.s.Literal()
+	define := &DefineExpr{Src: &src, Comments: comments, Name: StringExpr(name), Tags: tags}
+
+	if !p.scanToken(LBRACE, "'{'") {
+		return nil
+	}
+
+	for {
+		if p.scan() == RBRACE {
+			if p.hasComments() {
+				p.addErr(fmt.Sprintf("comments not allowed before closing }: %v", p.comments))
+				return nil
+			}
+			return define
+		}
+		p.unscan()
+
+		defineField := p.parseDefineField()
+		if defineField == nil {
+			return nil
+		}
+
+		define.Fields = append(define.Fields, defineField)
+	}
+} And here is the function you are asked to complete func (p *Parser) parseDefineField() *DefineFieldExpr
+func (p *Parser) parseDefineField() *DefineFieldExpr {
+	if !p.scanToken(IDENT, "define field name") {
+		return nil
+	}
+
+	src := p.src
+	name := p.s.Literal()
+
+	// Scan tokens until the first white space.
+	var typ bytes.Buffer
+	tok := p.scan()
+	for {
+		if tok != IDENT && tok != ASTERISK && tok != LBRACKET && tok != RBRACKET && tok != DOT { <MID> 		}
+		typ.WriteString(p.s.Literal())
+		tok = p.scanInternal(false /* skipWhitespace */)
+		if tok == EOF || tok == WHITESPACE {
+			break
+		}
+	}
+
+	field := &DefineFieldExpr{
+		Src:      &src,
+		Name:     StringExpr(name),
+		Comments: p.getComments(),
+		Type:     StringExpr(typ.String()),
+	}
+	p.setComments(field, field.Comments)
+	return field
+} Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

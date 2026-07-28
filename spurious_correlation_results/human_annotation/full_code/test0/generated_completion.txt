@@ -1,0 +1,2 @@
+	adapter.stream.SetIndent(prefix, indent)
+	adapter.stream.Flush()

@@ -1,0 +1,46 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/kubernetes/Kubernetes/vendor/sigs.k8s.io/kustomize/kustomize/v5/commands/build Below is the code repository: github.com/kubernetes/Kubernetes/ Below is the imported package path "fmt"; "github.com/spf13/cobra"; "github.com/spf13/pflag"; "sigs.k8s.io/kustomize/api/types" The receiver struct definitions of the function is not exist The parameter struct definition or not exist of the function is not exist The return value struct definitions or not exist of the function is types.LoadRestrictions The code snippets before the function is func AddFlagLoadRestrictor(set *pflag.FlagSet) {
+	set.StringVar(
+		&theFlags.loadRestrictor,
+		flagLoadRestrictorName,
+		types.LoadRestrictionsRootOnly.String(),
+		"if set to '"+types.LoadRestrictionsNone.String()+
+			"', local kustomizations may load files from outside their root. "+
+			"This does, however, break the "+
+			"relocatability of the kustomization.")
+}
+
+func AddFlagLoadRestrictorCompletion(cmd *cobra.Command) error {
+	err := cmd.RegisterFlagCompletionFunc(flagLoadRestrictorName, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{
+			types.LoadRestrictionsNone.String(),
+			types.LoadRestrictionsRootOnly.String(),
+		}, cobra.ShellCompDirectiveNoFileComp
+	})
+
+	if err != nil {
+		return fmt.Errorf("unable to add completion for --%s flag: %w", flagLoadRestrictorName, err)
+	}
+
+	return nil
+}
+
+func validateFlagLoadRestrictor() error {
+	switch theFlags.loadRestrictor {
+	case types.LoadRestrictionsRootOnly.String(),
+		types.LoadRestrictionsNone.String(), "":
+		return nil
+	default:
+		return fmt.Errorf(
+			"illegal flag value --%s %s; legal values: %v",
+			flagLoadRestrictorName, theFlags.loadRestrictor,
+			[]string{types.LoadRestrictionsRootOnly.String(),
+				types.LoadRestrictionsNone.String()})
+	}
+} And here is the function you are asked to complete func getFlagLoadRestrictorValue() types.LoadRestrictions
+func getFlagLoadRestrictorValue() types.LoadRestrictions {
+	switch theFlags.loadRestrictor { <MID> 	}
+} Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

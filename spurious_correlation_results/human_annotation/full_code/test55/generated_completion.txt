@@ -1,0 +1,3 @@
+If --interactive option is used, the user can compare keys using the greater than operator ">'.  The format for such a comparison is
+
+    mod("key

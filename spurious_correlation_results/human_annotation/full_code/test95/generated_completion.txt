@@ -1,0 +1,2 @@
+		return errors.Newf(
+			"unsafe load based splitter returning a split key equal to the start key of the range (%s)", splitKey)

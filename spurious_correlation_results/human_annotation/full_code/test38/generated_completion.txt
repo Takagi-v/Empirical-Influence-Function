@@ -1,0 +1,3 @@
+			res[last] = res[last] + ps[i]
+		} else {
+			res = append(res, ps[i])

@@ -1,0 +1,4 @@
+	case types.LoadRestrictionsNone.String(), "none":
+		return types.LoadRestrictionsNone
+	default:
+		return types.LoadRestrictionsRootOnly

@@ -1,0 +1,3 @@
+	return os.Expand(s, func(key string) string {
+		return env[key]
+	})

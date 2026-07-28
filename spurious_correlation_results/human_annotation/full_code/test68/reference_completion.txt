@@ -1,0 +1,4 @@
+		if addr == addressConfig.LoopbackAddress {
+			continue
+		}
+		addrs = append(addrs, addr)

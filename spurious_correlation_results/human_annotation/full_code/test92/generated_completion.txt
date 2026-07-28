@@ -1,0 +1,3 @@
+		path, err = uritemplates.Expand("termvectors", pathParam, s.client.config.URLTemplates.TermVector)
+	} else {
+		path

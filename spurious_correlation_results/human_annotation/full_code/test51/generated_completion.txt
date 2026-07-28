@@ -1,0 +1,2 @@
+	b = encoding.AddJSONPathTerminator(b)
+	return [][]byte{encoding.EncodeFalseDescending(b)}, nil

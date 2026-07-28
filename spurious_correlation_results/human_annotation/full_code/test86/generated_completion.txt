@@ -1,0 +1,2 @@
+	h.h.With(h.lvs).Observe(value)
+	atomic.AddInt64(&h.h.count, 1)

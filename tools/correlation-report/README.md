@@ -1,8 +1,33 @@
 # Attribution Analysis Visualizer
 
-React/Vite frontend for inspecting token-level saliency and training correlation reports.
+React/Vite frontend for inspecting **token-level ALTI saliency** and **training correlation** reports produced by this repo’s all-tokens pipeline (`src/intervention_experiment.py`).
 
-## Run Locally
+## What the current pipeline does
+
+For each semantic **test output token** \(t\):
+
+1. **ALTI** → top source tokens (UI: Top Correlations, up to 4).
+2. User (or offline precompute) focuses on **one** edge \((s \rightarrow t)\).
+3. **Train retrieval (viz-aligned)**  
+   \(L_{\text{probe}} = -\log(C[t,s]+\varepsilon)\),  
+   \(g_{\text{probe}} = \nabla_{\theta_{\text{LoRA}}} L_{\text{probe}}\),  
+   score trains by \(\cos(g_{\text{probe}}, g_{\text{train}})\) → **Top-10** samples.  
+   - `ce_only` bank: CE on LoRA  
+   - `ce_saliency` bank: CE + λ · contrastive saliency on LoRA (needs `attention_edges`)
+4. **Pair matching (Stage 3)** on those trains: scan answer tokens (default 3 targets × 3 sources), match with \(\cos(\nabla C_{\text{test}}, \nabla C_{\text{train}})\) on the **same LoRA** space.
+
+Report filenames:
+
+```text
+correlation_matching_results_{model_tag}_{task_id}_all_tokens.json
+```
+
+Example: `correlation_matching_results_ce_saliency_codesearchnet_go_test_a443fde88b8c161d_all_tokens.json`  
+(Do **not** load `*_prescreen.json` into the viewer.)
+
+---
+
+## Run the visualizer
 
 ```bash
 cd tools/correlation-report
@@ -12,7 +37,7 @@ pnpm dev
 
 Open `http://localhost:5173`.
 
-For static deployment:
+Static build:
 
 ```bash
 cd tools/correlation-report
@@ -21,59 +46,112 @@ cd dist
 python3 -m http.server 5173 --bind 0.0.0.0
 ```
 
-The built app reads bundled experiment files from `dist/data/` and also supports browser-side JSON import.
+The app can load bundled files under `dist/data/` and also **import JSON in the browser** (nothing is uploaded to a server).
 
-## Importing External Saliency Files
+---
 
-The New View has an import panel at the top:
+## How to use New View
 
-- Drag a JSON file into the panel, or choose a local JSON file.
-- Paste a JSON URL and click `Load URL`.
-- Open a report URL directly with `?reportUrl=...`, for example:
+### Single model
 
-```text
-https://your-site.example/visualizer/?reportUrl=https%3A%2F%2Fexample.com%2Fmy_saliency.json
+1. Import one `*_all_tokens.json`.
+2. Click an **output token** in Model Output (orange = target).
+3. Left: **Top Correlations** (`source → target` + saliency).
+4. **Click one** Top Correlation edge.
+5. Right: **Top-10 related trains** for that edge, with matched train pairs and `cos_sim`.
+
+Until you select a Top Correlation, the right panel stays empty (by design).
+
+### Dual-model compare (e.g. `ce_only` vs `ce_saliency`)
+
+1. Load left JSON and right JSON (two imports).
+2. Panels **scroll independently**; token linking is **off** by default (enable Link only if you want synced clicks).
+3. Same click flow on each side.
+
+### Reading scores
+
+| UI label | Meaning |
+|----------|---------|
+| saliency | ALTI \(C[t,s]\) on the test side |
+| probe / `coarse` on a train group | Retrieval score \(\cos(g_{\text{probe}}, g_{\text{train}})\) (stored as `coarse_cos_sim`) |
+| pair `cos_sim` | \(\cos(\nabla C_{\text{test}}, \nabla C_{\text{train}})\) for one matched edge pair |
+| group `best` | Max pair `cos_sim` among currently filtered pairs for that train |
+
+---
+
+## Generating reports (backend)
+
+Prefer **LoRA adapters** (not merged full weights) for attribution accuracy:
+
+```bash
+# From repo root
+bash run_batch_experiments.sh \
+  --model-path  /path/to/code-corr-annotation/outputs/go_single/models/ce_saliency \
+  --base-model-path /path/to/code-corr-annotation/models/Qwen2.5-Coder-7B-Instruct \
+  --train-data  /path/to/csn10k_train_chat.jsonl \
+  --test-data   /path/to/csn500_test_chat.jsonl \
+  --indices 106
 ```
 
-Remote `reportUrl` imports require the JSON host to allow browser CORS requests.
+Use `.../models/ce_only` the same way for the CE-only adapter.
 
-This is a static frontend import path. The file is parsed in the browser and is not saved to the server. A persistent `POST /api/upload-report` endpoint would require a separate backend and is not included here.
+Notes:
 
-## Supported Formats
+- Detects `adapter_config.json` → loads base + Peft; grads on all `lora_*` params.
+- First run builds `.cache/saliency_train_bank/` (slow); later runs reuse it. Legacy `.cache/prescreen_sketch/` is unused.
+- For `ce_saliency`, train JSONL must keep **`attention_edges`** (re-convert with updated `tools/compact_to_chat_jsonl.py` if needed).
+- Sync this repo to the machine that runs experiments; filenames include `model_tag` from the adapter folder name.
 
-### 1. Native all-token correlation report
+---
 
-The native format is the output used by this repository, usually named:
+## Importing reports in the UI
+
+- Drag a JSON file, or choose a file.
+- Paste a JSON URL → `Load URL`.
+- Or open with `?reportUrl=...` (remote host must allow CORS).
+
+### 1. Native all-token correlation report (primary)
 
 ```text
-correlation_matching_results_test{N}_all_tokens.json
+correlation_matching_results_{model_tag}_{task_id}_all_tokens.json
 ```
+
+Useful `experiment_meta` fields:
+
+- `model_name` / `model_path`
+- `screening`: `saliency_probe_bank`
+- `config.GRAD_SPACE`: `lora` (preferred) or `fine_attn`
+- `config.BANK_LOSS_MODE`: `ce_only` | `ce_saliency`
+- `config.PROBE`: `L_probe=-log(C+eps)`
 
 Minimal shape:
 
 ```json
 {
   "experiment_meta": {
-    "test_sample_index": 58,
+    "test_sample_index": 106,
+    "task_id": "codesearchnet_go_test_…",
+    "model_name": "ce_saliency",
     "mode": "all_tokens",
-    "tokens_analyzed": 2
+    "screening": "saliency_probe_bank",
+    "tokens_analyzed": 30
   },
   "test_sample_baseline": {
-    "full_tokens": ["def", "Ġfoo", "(", ")", ":", "Ċ", "Ġ", "Ġreturn", "Ġbar"],
-    "correct_full_tokens": ["def", "Ġfoo", "(", ")", ":", "Ċ", "Ġ", "Ġreturn", "Ġbaz"],
-    "prompt_len": 6
+    "full_tokens": ["…"],
+    "correct_full_tokens": ["…"],
+    "prompt_len": 100
   },
   "per_token_results": [
     {
-      "target_token_index": 7,
-      "target_token": "Ġreturn",
+      "target_token_index": 108,
+      "target_token": " err",
       "top_correlations": [
         {
-          "source_token": "def",
-          "source_token_index": 0,
-          "target_token": "Ġreturn",
-          "target_token_index": 7,
-          "saliency_score": 0.42
+          "source_token": "func",
+          "source_token_index": 42,
+          "target_token": " err",
+          "target_token_index": 108,
+          "saliency_score": 0.11
         }
       ],
       "correlation_pairs": []
@@ -83,11 +161,11 @@ Minimal shape:
 }
 ```
 
-If `correlation_pairs` and `train_sample_details` are present, the right-side training correlation panel is enabled. If they are empty, the viewer still shows token saliency and top source tokens.
+If `correlation_pairs` / `train_sample_details` are present, the training panel is enabled. Empty pairs still show saliency + top sources.
 
 ### 2. Generic saliency-only format
 
-Use this when an external method only has one saliency vector per target token.
+When an external method only has one saliency vector per target:
 
 ```json
 {
@@ -99,62 +177,36 @@ Use this when an external method only has one saliency vector per target token.
     {
       "target_token_index": 7,
       "scores": [0.12, 0.04, 0.0, 0.0, 0.0, 0.0, 0.02, 0.0, 0.0]
-    },
-    {
-      "target_token_index": 8,
-      "scores": [0.03, 0.22, 0.0, 0.0, 0.0, 0.0, 0.08, 0.11, 0.0]
     }
   ]
 }
 ```
 
-Field rules:
-
-- `tokens`: tokenizer tokens aligned with every saliency vector. GPT-style whitespace markers such as `Ġ` and newline markers such as `Ċ` are decoded by the viewer.
-- `prompt_len`: number of prompt tokens. Target tokens are normally at indices `>= prompt_len`.
-- `correct_tokens`: optional reference tokens. If omitted, the viewer uses `tokens` as the reference.
-- `saliency_list[].target_token_index`: index of the target token being explained.
-- `saliency_list[].scores`: saliency scores aligned to `tokens`; `scores[i]` is the source-token score for token `tokens[i]`.
-
-Accepted aliases:
-
-- `full_tokens` or `token_list` instead of `tokens`.
-- `start_index` or `answer_start_index` instead of `prompt_len`.
-- `saliency`, `saliencies`, or `targets` instead of `saliency_list`.
-- `index` or `target_index` instead of `target_token_index`.
-- `saliency`, `saliency_scores`, or `source_scores` instead of `scores`.
-
-Object-map form is also accepted:
-
-```json
-{
-  "tokens": ["def", "Ġfoo", "(", ")", ":", "Ċ", "Ġ", "Ġreturn"],
-  "prompt_len": 6,
-  "saliency_by_target": {
-    "7": [0.12, 0.04, 0.0, 0.0, 0.0, 0.0, 0.02, 0.0]
-  }
-}
-```
+Aliases: `full_tokens` / `token_list`; `start_index` / `answer_start_index`; `saliency` / `targets`; `index` / `target_index`; object map `saliency_by_target`.
 
 ### 3. Legacy `latest_saliency.json`
 
-The older compare-view saliency file is accepted for import:
+Still accepted; importer maps it to the generic saliency-only view.
 
-```json
-{
-  "target_test_sample": {
-    "before": {
-      "full_tokens": ["def", "Ġfoo", "(", ")", ":", "Ċ", "Ġ", "Ġreturn"],
-      "start_index": 6,
-      "saliency_list": [
-        {
-          "index": 7,
-          "saliency": [0.12, 0.04, 0.0, 0.0, 0.0, 0.0, 0.02, 0.0]
-        }
-      ]
-    }
-  }
-}
-```
+---
 
-The importer converts this to the generic saliency-only view.
+## Stage 3 train-side candidates (for reading the UI)
+
+On each retrieved train sample (defaults):
+
+- Up to **3** non-trivial answer **targets** \(t'\) (scanned from the start of the answer).
+- For each \(t'\), ALTI top-**3** non-trivial **sources** \(s'\).
+- → up to **9** candidate train edges, each matched to the **selected** test edge.
+
+“Trivial” ≈ chat template / whitespace / lone punctuation — skipped as sources and targets.
+
+---
+
+## Related tools
+
+| Tool | Role |
+|------|------|
+| `run_batch_experiments.sh` | Batch all-tokens runs + model-tagged outputs |
+| `tools/compact_to_chat_jsonl.py` | Compact graphsignal → chat JSONL (**keeps `attention_edges`**) |
+| `tools/merge_lora_adapter.py` | Optional merge for inference-only; **prefer adapters for attribution** |
+| `.cache/saliency_train_bank/` | LoRA train gradient sketches (per model / bank loss) |

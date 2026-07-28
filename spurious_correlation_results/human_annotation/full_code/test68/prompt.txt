@@ -1,0 +1,61 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/cockroachdb/cockroach/pkg/kv/kvclient/kvtenant Below is the code repository: github.com/cockroachdb/cockroach/ Below is the imported package path "context"; "io"; "math/rand"; "net"; "sort"; "time"; "github.com/cockroachdb/cockroach/pkg/config/zonepb"; "github.com/cockroachdb/cockroach/pkg/gossip"; "github.com/cockroachdb/cockroach/pkg/keys"; "github.com/cockroachdb/cockroach/pkg/kv"; "github.com/cockroachdb/cockroach/pkg/kv/kvclient"; "github.com/cockroachdb/cockroach/pkg/kv/kvclient/kvcoord"; "github.com/cockroachdb/cockroach/pkg/kv/kvclient/rangecache"; "github.com/cockroachdb/cockroach/pkg/kv/kvpb"; "github.com/cockroachdb/cockroach/pkg/multitenant/mtinfo"; "github.com/cockroachdb/cockroach/pkg/multitenant/mtinfopb"; "github.com/cockroachdb/cockroach/pkg/multitenant/tenantcapabilities"; "github.com/cockroachdb/cockroach/pkg/multitenant/tenantcapabilitiespb"; "github.com/cockroachdb/cockroach/pkg/roachpb"; "github.com/cockroachdb/cockroach/pkg/rpc"; "github.com/cockroachdb/cockroach/pkg/rpc/nodedialer"; "github.com/cockroachdb/cockroach/pkg/rpc/rpcbase"; "github.com/cockroachdb/cockroach/pkg/server/serverpb"; "github.com/cockroachdb/cockroach/pkg/server/settingswatcher"; "github.com/cockroachdb/cockroach/pkg/settings"; "github.com/cockroachdb/cockroach/pkg/spanconfig"; "github.com/cockroachdb/cockroach/pkg/sql/isql"; "github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"; "github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgerror"; "github.com/cockroachdb/cockroach/pkg/ts/tspb"; "github.com/cockroachdb/cockroach/pkg/util/grpcutil"; "github.com/cockroachdb/cockroach/pkg/util/hlc"; "github.com/cockroachdb/cockroach/pkg/util/log"; "github.com/cockroachdb/cockroach/pkg/util/rangedesc"; "github.com/cockroachdb/cockroach/pkg/util/retry"; "github.com/cockroachdb/cockroach/pkg/util/syncutil"; "github.com/cockroachdb/cockroach/pkg/util/syncutil/singleflight"; "github.com/cockroachdb/cockroach/pkg/util/timeutil"; "github.com/cockroachdb/cockroach/pkg/util/uuid"; "github.com/cockroachdb/errors"; "github.com/cockroachdb/errors/errorspb"; "google.golang.org/grpc"; "google.golang.org/grpc/codes"; "google.golang.org/grpc/status"; "storj.io/drpc" The receiver struct definitions of the function is not exist The parameter struct definition or not exist of the function is addressConfig KVAddressConfig The return value struct definitions or not exist of the function is *ast.ArrayType The code snippets before the function is func (c *connector) drpcDialAddr(ctx context.Context, addr string) (conn drpc.Conn, err error) {
+	if c.rpcDialTimeout == 0 {
+		return c.rpcContext.DRPCUnvalidatedDial(addr, roachpb.Locality{}).Connect(ctx)
+	}
+	err = timeutil.RunWithTimeout(ctx, "dial addr", c.rpcDialTimeout, func(ctx context.Context) error {
+		conn, err = c.rpcContext.DRPCUnvalidatedDial(addr, roachpb.Locality{}).Connect(ctx)
+		return err
+	})
+	return conn, err
+}
+
+func (c *connector) tryForgetClient(ctx context.Context, client *client) {
+	if ctx.Err() != nil {
+		// Error (may be) due to context. Don't forget client.
+		return
+	}
+	// Compare-and-swap to avoid thrashing.
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.mu.client == client {
+		c.mu.client = nil
+	}
+}
+
+) (resp *serverpb.LivenessResponse, retErr error) {
+	retErr = c.withClient(ctx, func(ctx context.Context, client *client) (err error) {
+		resp, err = client.Liveness(ctx, req)
+		return
+	})
+	return
+}
+
+) (resp *tspb.TimeSeriesQueryResponse, retErr error) {
+	retErr = c.withClient(ctx, func(ctx context.Context, client *client) (err error) {
+		resp, err = client.Query(ctx, req)
+		return
+	})
+	return
+}
+
+func AddressResolver(s kvclient.NodeDescStore) nodedialer.AddressResolver {
+	return func(nodeID roachpb.NodeID) (net.Addr, roachpb.Locality, error) {
+		nd, err := s.GetNodeDescriptor(nodeID)
+		if err != nil {
+			return nil, roachpb.Locality{}, err
+		}
+		return &nd.Address, nd.Locality, nil
+	}
+} And here is the function you are asked to complete func CombineKVAddresses(addressConfig KVAddressConfig) *ast.ArrayType
+func CombineKVAddresses(addressConfig KVAddressConfig) []string {
+	addrs := make([]string, 0, len(addressConfig.RemoteAddresses)+1)
+	for _, addr := range addressConfig.RemoteAddresses { <MID> 	}
+	if addressConfig.LoopbackAddress != "" {
+		addrs = append(addrs, addressConfig.LoopbackAddress)
+	}
+	return addrs
+} Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

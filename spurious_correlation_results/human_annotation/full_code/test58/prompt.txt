@@ -1,0 +1,45 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/cockroachdb/cockroach/pkg/cloud Below is the code repository: github.com/cockroachdb/cockroach/ Below is the imported package path "context"; "database/sql/driver"; "io"; "net/http"; "net/url"; "github.com/cockroachdb/cockroach/pkg/base"; "github.com/cockroachdb/cockroach/pkg/blobs"; "github.com/cockroachdb/cockroach/pkg/cloud/cloudpb"; "github.com/cockroachdb/cockroach/pkg/security/username"; "github.com/cockroachdb/cockroach/pkg/settings/cluster"; "github.com/cockroachdb/cockroach/pkg/sql/isql"; "github.com/cockroachdb/cockroach/pkg/util/cidr"; "github.com/cockroachdb/cockroach/pkg/util/ioctx"; "github.com/cockroachdb/cockroach/pkg/util/metric"; "github.com/cockroachdb/errors" The receiver struct definitions of the function is not exist The parameter struct definition or not exist of the function is (st *cluster.Settings, conf base.ExternalIODirConfig, lookup *cidr.Lookup) The return value struct definitions or not exist of the function is *EarlyBootExternalStorageAccessor
+
+// Type EarlyBootExternalStorageAccessor definition:
+type EarlyBootExternalStorageAccessor struct {
+	conf     base.ExternalIODirConfig
+	settings *cluster.Settings
+	limiters Limiters
+	metrics  metric.Struct
+}
+// Methods:
+- func (a *EarlyBootExternalStorageAccessor) Metrics() metric.Struct
+- func (a *EarlyBootExternalStorageAccessor) Limiters() Limiters
+- func (a *EarlyBootExternalStorageAccessor) OpenURL((ctx context.Context, uri string, opts *ast.Ellipsis)) ((ExternalStorage, error))
+ The code snippets before the function is func WrapErrFileDoesNotExist(err error, msg string) error {
+	//nolint:errwrap
+	return errors.Wrapf(ErrFileDoesNotExist, "%s: %s", err.Error(), msg)
+}
+
+func RedactedParams(strs ...string) map[string]struct{} {
+	if len(strs) == 0 {
+		return nil
+	}
+	m := make(map[string]struct{}, len(strs))
+	for i := range strs {
+		m[strs[i]] = struct{}{}
+	}
+	return m
+}
+
+func (e *EarlyBootExternalStorageContext) ExternalStorageOptions() ExternalStorageOptions {
+	var options ExternalStorageOptions
+	for _, option := range e.Options {
+		option(&options)
+	}
+	return options
+} And here is the function you are asked to complete func NewEarlyBootExternalStorageAccessor((st *cluster.Settings, conf base.ExternalIODirConfig, lookup *cidr.Lookup)) *EarlyBootExternalStorageAccessor
+) *EarlyBootExternalStorageAccessor {
+	return &EarlyBootExternalStorageAccessor{
+		conf:     conf,
+		settings: st,
+		limiters: MakeLimiters(&st.SV), <MID> } Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

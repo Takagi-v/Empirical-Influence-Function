@@ -1,0 +1,4 @@
+		pathParam["id"] = s.id
+		path, err = uritemplates.Expand("/{index}/{type}/{id}/_termvector", pathParam)
+	} else {
+		path, err = uritemplates.Expand("/{index}/{type}/_termvector", pathParam)

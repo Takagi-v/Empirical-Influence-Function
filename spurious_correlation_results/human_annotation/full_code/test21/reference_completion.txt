@@ -1,0 +1,3 @@
+		tracef("uint available for flag name %[1]q with value=%[2]v (cmd=%[3]q)", name, v, cmd.Name)
+
+		return v

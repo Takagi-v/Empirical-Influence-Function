@@ -1,0 +1,99 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/prometheus/Prometheus/discovery/file Below is the code repository: github.com/prometheus/Prometheus/ Below is the imported package path "context"; "encoding/json"; "errors"; "fmt"; "io"; "log/slog"; "maps"; "os"; "path/filepath"; "strings"; "sync"; "time"; "github.com/fsnotify/fsnotify"; "github.com/grafana/regexp"; "github.com/prometheus/client_golang/prometheus"; "github.com/prometheus/common/config"; "github.com/prometheus/common/model"; "github.com/prometheus/common/promslog"; "go.yaml.in/yaml/v2"; "github.com/prometheus/prometheus/discovery"; "github.com/prometheus/prometheus/discovery/targetgroup" The receiver struct definitions of the function is type Discovery struct {
+	paths      []string
+	watcher    *fsnotify.Watcher
+	interval   time.Duration
+	timestamps map[string]float64
+	lock       sync.RWMutex
+
+	// lastRefresh stores which files were found during the last refresh
+	// and how many target groups they contained.
+	// This is used to detect deleted target groups.
+	lastRefresh map[string]int
+	logger      *slog.Logger
+
+	metrics *fileMetrics
+}
+
+// Methods:
+- func (d *Discovery) listFiles() *ast.ArrayType
+- func (d *Discovery) watchFiles()
+- func (d *Discovery) Run((ctx context.Context, ch *ast.ChanType))
+- func (d *Discovery) writeTimestamp((filename string, timestamp float64))
+- func (d *Discovery) deleteTimestamp(filename string)
+- func (d *Discovery) stop()
+- func (d *Discovery) refresh((ctx context.Context, ch *ast.ChanType))
+- func (d *Discovery) readFile(filename string) ((*ast.ArrayType, error))
+ The parameter struct definition or not exist of the function is not exist The return value struct definitions or not exist of the function is not exist The code snippets before the function is func (t *TimestampCollector) addDiscoverer(disc *Discovery) {
+	t.lock.Lock()
+	t.discoverers[disc] = struct{}{}
+	t.lock.Unlock()
+}
+
+func (t *TimestampCollector) removeDiscoverer(disc *Discovery) {
+	t.lock.Lock()
+	delete(t.discoverers, disc)
+	t.lock.Unlock()
+}
+
+func NewTimestampCollector() *TimestampCollector {
+	return &TimestampCollector{
+		Description: prometheus.NewDesc(
+			"prometheus_sd_file_mtime_seconds",
+			"Timestamp (mtime) of files read by FileSD. Timestamp is set at read time.",
+			[]string{"filename"},
+			nil,
+		),
+		discoverers: make(map[*Discovery]struct{}),
+	}
+}
+
+func NewDiscovery(conf *SDConfig, logger *slog.Logger, metrics discovery.DiscovererMetrics) (*Discovery, error) {
+	fm, ok := metrics.(*fileMetrics)
+	if !ok {
+		return nil, errors.New("invalid discovery metrics type")
+	}
+
+	if logger == nil {
+		logger = promslog.NewNopLogger()
+	}
+
+	disc := &Discovery{
+		paths:      conf.Files,
+		interval:   time.Duration(conf.RefreshInterval),
+		timestamps: make(map[string]float64),
+		logger:     logger,
+		metrics:    fm,
+	}
+
+	fm.init(disc)
+
+	return disc, nil
+}
+
+func (d *Discovery) listFiles() []string {
+	var paths []string
+	for _, p := range d.paths {
+		files, err := filepath.Glob(p)
+		if err != nil {
+			d.logger.Error("Error expanding glob", "glob", p, "err", err)
+			continue
+		}
+		paths = append(paths, files...)
+	}
+	return paths
+} And here is the function you are asked to complete func (d *Discovery) watchFiles()
+func (d *Discovery) watchFiles() {
+	if d.watcher == nil {
+		panic("no watcher configured")
+	}
+	for _, p := range d.paths {
+		if dir, _ := filepath.Split(p); dir != "" { <MID> 		}
+		if err := d.watcher.Add(p); err != nil {
+			d.logger.Error("Error adding file watch", "path", p, "err", err)
+		}
+	}
+} Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

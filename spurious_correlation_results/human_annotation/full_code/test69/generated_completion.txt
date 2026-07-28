@@ -1,0 +1,2 @@
+		log.KvExec.Fatalf(ctx, "unexpected error pruning sideloaded file %s: %v",
+			filename, err)

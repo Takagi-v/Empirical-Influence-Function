@@ -1,0 +1,15 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/cockroachdb/cockroach/pkg/sql/sem/tree Below is the code repository: github.com/cockroachdb/cockroach/ Below is the imported package path "github.com/cockroachdb/cockroach/pkg/settings"; "github.com/cockroachdb/redact" The receiver struct definitions of the function is not exist The parameter struct definition or not exist of the function is (rootAST Statement, ann *Annotations, fs FmtFlags) The return value struct definitions or not exist of the function is redact.RedactableString The code snippets before the function is ) redact.RedactableString {
+	fs := FmtSimple | FmtAlwaysQualifyTableNames | FmtMarkRedactionNode
+	if !redactNamesInSQLStatementLog.Get(sv) {
+		fs = fs | FmtOmitNameRedaction
+	}
+	return formatStmtKeyAsRedactableString(statement, annotations, fs)
+} And here is the function you are asked to complete func formatStmtKeyAsRedactableString((rootAST Statement, ann *Annotations, fs FmtFlags)) redact.RedactableString
+) redact.RedactableString {
+	f := NewFmtCtx(
+		fs, <MID> 	return redact.RedactableString(formattedRedactableStatementString)
+} Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

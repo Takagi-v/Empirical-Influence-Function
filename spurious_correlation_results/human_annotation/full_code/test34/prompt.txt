@@ -1,0 +1,30 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/cockroachdb/cockroach/pkg/util/timeutil Below is the code repository: github.com/cockroachdb/cockroach/ Below is the imported package path "slices"; "time"; "github.com/cockroachdb/cockroach/pkg/util/syncutil" The receiver struct definitions of the function is not exist The parameter struct definition or not exist of the function is d time.Duration The return value struct definitions or not exist of the function is *BroadcastTicker
+
+// Type BroadcastTicker definition:
+type BroadcastTicker struct {
+	ticker *time.Ticker
+	stopC  chan struct{}
+	mu     struct {
+		syncutil.Mutex
+		chans []chan time.Time
+	}
+}
+// Methods:
+- func (t *BroadcastTicker) run()
+- func (t *BroadcastTicker) broadcast(val time.Time)
+- func (t *BroadcastTicker) Stop()
+- func (t *BroadcastTicker) Reset(d time.Duration)
+- func (t *BroadcastTicker) NewTicker() *BroadcastTickerReceiver
+- func (t *BroadcastTicker) allocNewTicker() ((*ast.ChanType, *BroadcastTickerReceiver))
+- func (t *BroadcastTicker) register(c *ast.ChanType)
+- func (t *BroadcastTicker) registerLocked(c *ast.ChanType)
+- func (t *BroadcastTicker) unregister(c *ast.ChanType)
+ The code snippets before the function is not exist And here is the function you are asked to complete func NewBroadcastTicker(d time.Duration) *BroadcastTicker
+func NewBroadcastTicker(d time.Duration) *BroadcastTicker {
+	t := &BroadcastTicker{
+		ticker: time.NewTicker(d),
+		stopC:  make(chan struct{}), <MID> } Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

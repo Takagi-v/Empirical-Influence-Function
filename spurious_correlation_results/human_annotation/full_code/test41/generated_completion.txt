@@ -1,0 +1,1 @@
+  ## Set to true to report for each container per device blkio, network (eth0, eth1,...)

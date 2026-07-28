@@ -70,10 +70,14 @@ function experimentDataPlugin(): Plugin {
 
     for (const f of files) {
       if (!f.endsWith('.json')) continue
+      if (f.includes('_prescreen')) continue
       // Use stem as taskId; strip trailing _all_tokens if present for cleaner display
       const stem = f.slice(0, -5)
       const taskId = stem.endsWith('_all_tokens') ? stem.slice(0, -11) : stem
-      allTokensExperiments.push({ taskId, label: taskId, fileName: f })
+      // Prefer showing model tag when filename is correlation_matching_results_{model}_{task}_all_tokens
+      const m = stem.match(/^correlation_matching_results_(.+)_all_tokens$/)
+      const label = m ? m[1] : taskId
+      allTokensExperiments.push({ taskId, label, fileName: f })
     }
 
     allTokensExperiments.sort((a, b) => a.taskId.localeCompare(b.taskId))

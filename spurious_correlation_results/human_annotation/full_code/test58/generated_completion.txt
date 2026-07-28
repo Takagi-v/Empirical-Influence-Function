@@ -1,0 +1,2 @@
+		metrics:  metric.NewStruct(st, "cloud_externals"),
+	}

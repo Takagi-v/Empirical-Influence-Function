@@ -1,0 +1,5 @@
+		col := ord.ColIdx
+		cmp, err := nextChunkRow[col].Compare(s.Ctx(), types[col], &s.alloc, s.FlowCtx.EvalCtx, &prefix[col])
+		if cmp != 0 || err != nil {
+			return true, err
+		}

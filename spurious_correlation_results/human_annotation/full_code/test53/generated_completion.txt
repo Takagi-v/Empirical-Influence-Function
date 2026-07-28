@@ -1,0 +1,5 @@
+		compType := getComparableType(typ)
+		return typedValue{
+			typ:   reflect.PointerTo(compType),
+			value: val,
+		

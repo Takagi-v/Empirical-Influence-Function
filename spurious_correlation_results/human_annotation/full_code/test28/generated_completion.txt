@@ -1,0 +1,2 @@
+	defer t.parent.remove(t)
+	return t.Terminated

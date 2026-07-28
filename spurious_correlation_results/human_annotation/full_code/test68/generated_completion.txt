@@ -1,0 +1,4 @@
+		if addr.Locality == roachpb.Locality_SELF {
+			continue
+		}
+		addrs = append(addrs, addr.Address)

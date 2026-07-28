@@ -7,6 +7,149 @@
     font-family: system-ui, -apple-system, sans-serif;
 }
 
+.panelRootCompact {
+    gap: 12px;
+    padding-bottom: 24px;
+}
+
+/* ── Dual import / compare ── */
+.dualImportRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+@media (max-width: 1100px) {
+    .dualImportRow { grid-template-columns: 1fr; }
+}
+.slotImportCard {
+    display: grid;
+    gap: 10px;
+    padding: 14px 16px;
+    background: #ffffff;
+    border: 1px solid #dbe3ef;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+    min-width: 0;
+}
+.slotImportHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+}
+.slotImportTitle {
+    font-size: 13px;
+    font-weight: 800;
+    color: #1e293b;
+}
+.slotImportDesc {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+}
+.slotClearBtn {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #64748b;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.slotMetaList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 96px;
+    overflow: auto;
+}
+.compareToolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+}
+.linkToggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+}
+.compareHint {
+    font-size: 12px;
+    color: #64748b;
+}
+.dualGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: stretch;
+    /* Keep page chrome fixed; each model column scrolls on its own. */
+    max-height: calc(100vh - 220px);
+    min-height: 480px;
+}
+.singleGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+}
+@media (max-width: 1400px) {
+    .dualGrid {
+        grid-template-columns: 1fr;
+        max-height: none;
+    }
+}
+.modelColumn {
+    min-width: 0;
+    min-height: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 12px 16px;
+    background: #fff;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+.dualGrid .modelColumn {
+    /* Independent vertical scroll per model; do not share page scroll. */
+    max-height: 100%;
+}
+.modelBanner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 12px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+}
+.modelBannerLabel {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #4338ca;
+}
+.modelBannerName {
+    font-size: 15px;
+    font-weight: 800;
+    color: #1e1b4b;
+}
+.modelBannerMeta {
+    font-size: 12px;
+    color: #64748b;
+}
+
 /* ── Experiment selector ── */
 .metaSelector {
     display: flex;
@@ -269,6 +412,23 @@
     min-width: 0;
 }
 
+.panelRootCompact .bottomSection {
+    /* In dual view, keep train correlations scroll local to this column. */
+    align-items: stretch;
+}
+.panelRootCompact .bottomLeft {
+    position: static;
+}
+.panelRootCompact .bottomRight {
+    max-height: min(70vh, 820px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.panelRootCompact .bottomPanel {
+    min-height: 0;
+}
+
 /* ── Correlations List (Left Pane) ── */
 .correlationList {
     background: linear-gradient(135deg, #1e1e2e, #2a2a3e);
@@ -285,6 +445,17 @@
     font-weight: 700;
     text-transform: uppercase;
     margin-bottom: 4px;
+}
+.correlationListHint {
+    font-size: 11px;
+    color: #89b4fa;
+    line-height: 1.35;
+    margin-bottom: 4px;
+}
+.corrArrow {
+    margin: 0 6px;
+    color: #a6adc8;
+    font-weight: 700;
 }
 .correlationListItems {
     display: grid;

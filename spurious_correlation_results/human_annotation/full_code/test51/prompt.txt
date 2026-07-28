@@ -1,0 +1,57 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/cockroachdb/cockroach/pkg/util/json Below is the code repository: github.com/cockroachdb/cockroach/ Below is the imported package path "bytes"; "encoding/json"; "fmt"; "io"; "maps"; "math/big"; "reflect"; "slices"; "sort"; "strconv"; "strings"; "unicode/utf8"; "unsafe"; "github.com/cockroachdb/apd/v3"; "github.com/cockroachdb/cockroach/pkg/keysbase"; "github.com/cockroachdb/cockroach/pkg/sql/inverted"; "github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"; "github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgerror"; "github.com/cockroachdb/cockroach/pkg/util/buildutil"; "github.com/cockroachdb/cockroach/pkg/util/deduplicate"; "github.com/cockroachdb/cockroach/pkg/util/encoding"; "github.com/cockroachdb/cockroach/pkg/util/intsets"; "github.com/cockroachdb/errors" The receiver struct definitions of the function is type jsonFalse struct{}
+
+// Methods:
+- func (jsonFalse) Type() Type
+- func (j jsonFalse) MaybeDecode() JSON
+- func (j jsonFalse) AsDecimal() ((*apd.Decimal, bool))
+- func (j jsonFalse) AsBool() ((bool, bool))
+- func (j jsonFalse) tryDecode() ((JSON, error))
+- func (j jsonFalse) Compare(other JSON) ((int, error))
+- func (jsonFalse) Format(buf *bytes.Buffer)
+- func (j jsonFalse) String() string
+- func (jsonFalse) Size() uintptr
+- func (j jsonFalse) AsArray() ((*ast.ArrayType, bool))
+- func (jsonFalse) EncodeInvertedIndexKeys(b *ast.ArrayType) ((*ast.ArrayType, error))
+- func (j jsonFalse) encodeContainingInvertedIndexSpans((b *ast.ArrayType, isRoot bool, isObjectValue bool)) ((inverted.Expression, error))
+- func (j jsonFalse) encodeContainedInvertedIndexSpans((b *ast.ArrayType, isRoot bool, isObjectValue bool)) ((inverted.Expression, error))
+- func (jsonFalse) numInvertedIndexEntries() ((int, error))
+- func (j jsonFalse) allPaths() ((*ast.ArrayType, error))
+- func (j jsonFalse) EncodeForwardIndex((buf *ast.ArrayType, dir encoding.Direction)) ((*ast.ArrayType, error))
+- func (jsonFalse) FetchValKey(string) ((JSON, error))
+- func (j jsonFalse) FetchValIdx(idx int) ((JSON, error))
+- func (jsonFalse) FetchValKeyOrIdx(string) ((JSON, error))
+- func (jsonFalse) RemoveString(string) ((JSON, bool, error))
+- func (jsonFalse) RemoveIndex(int) ((JSON, bool, error))
+- func (jsonFalse) Concat(other JSON) ((JSON, error))
+- func (j jsonFalse) AsText() ((*string, error))
+- func (jsonFalse) Exists(string) ((bool, error))
+- func (j jsonFalse) StripNulls() ((JSON, bool, error))
+- func (jsonFalse) ObjectIter() ((*ObjectIterator, error))
+- func (jsonFalse) isScalar() bool
+- func (jsonFalse) Len() int
+- func (jsonFalse) toGoRepr() ((*ast.InterfaceType, error))
+- func (jsonFalse) RemovePath(*ast.ArrayType) ((JSON, bool, error))
+- func (j jsonFalse) doRemovePath(*ast.ArrayType) ((JSON, bool, error))
+- func (j jsonFalse) HasContainerLeaf() ((bool, error))
+ The parameter struct definition or not exist of the function is (b *ast.ArrayType, isRoot bool, isObjectValue bool) The return value struct definitions or not exist of the function is (inverted.Expression, error) The code snippets before the function is func (jsonTrue) EncodeInvertedIndexKeys(b []byte) ([][]byte, error) {
+	b = encoding.AddJSONPathTerminator(b)
+	return [][]byte{encoding.EncodeTrueAscending(b)}, nil
+}
+
+) (inverted.Expression, error) {
+	return encodeContainingInvertedIndexSpansFromLeaf(j, b, isRoot, isObjectValue)
+}
+
+func (jsonFalse) EncodeInvertedIndexKeys(b []byte) ([][]byte, error) {
+	b = encoding.AddJSONPathTerminator(b)
+	return [][]byte{encoding.EncodeFalseAscending(b)}, nil
+}
+
+) (inverted.Expression, error) {
+	return encodeContainingInvertedIndexSpansFromLeaf(j, b, isRoot, isObjectValue)
+} And here is the function you are asked to complete func (j jsonFalse) encodeContainedInvertedIndexSpans((b *ast.ArrayType, isRoot bool, isObjectValue bool)) ((inverted.Expression, error))
+) (inverted.Expression, error) { <MID> } Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

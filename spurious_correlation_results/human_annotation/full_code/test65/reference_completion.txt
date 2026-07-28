@@ -1,0 +1,3 @@
+	iter := any.cfg.BorrowIterator(any.buf)
+	defer any.cfg.ReturnIterator(iter)
+	return iter.Read()

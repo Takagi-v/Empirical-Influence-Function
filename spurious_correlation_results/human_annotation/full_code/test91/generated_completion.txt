@@ -1,0 +1,2 @@
+		l = m.UID.Size()
+		n += 1 + l + sovGenerated(uint64(l))

@@ -1,0 +1,4 @@
+		if oserror.IsNotExist(err) {
+			return 0, errSideloadedFileNotFound
+		}
+		return 0, err

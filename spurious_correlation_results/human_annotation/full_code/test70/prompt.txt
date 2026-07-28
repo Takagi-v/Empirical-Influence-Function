@@ -1,0 +1,179 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/cockroachdb/cockroach/pkg/workload/schemachange Below is the code repository: github.com/cockroachdb/cockroach/ Below is the imported package path "context"; "fmt"; "slices"; "strings"; "github.com/cockroachdb/cockroach/pkg/sql/parser"; "github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"; "github.com/cockroachdb/cockroach/pkg/sql/sem/tree"; "github.com/cockroachdb/cockroach/pkg/sql/types"; "github.com/cockroachdb/errors"; "github.com/jackc/pgx/v5"; "github.com/jackc/pgx/v5/pgconn" The receiver struct definitions of the function is *operationGenerator The parameter struct definition or not exist of the function is (ctx context.Context, tx pgx.Tx) The return value struct definitions or not exist of the function is (bool, error) The code snippets before the function is ) (bool, error) {
+	return og.scanBool(ctx, tx, `
+WITH enum_members AS (
+	SELECT
+				json_array_elements(
+						crdb_internal.pb_to_json(
+								'cockroach.sql.sqlbase.Descriptor',
+								descriptor
+						)->'type'->'enumMembers'
+				)->>'logicalRepresentation'
+				AS v
+		FROM
+				system.descriptor
+		WHERE
+				id = ($1::REGTYPE::INT8 - 100000)
+)
+SELECT
+	CASE WHEN EXISTS (
+		SELECT v FROM enum_members WHERE v = $2::string
+	) THEN true
+	ELSE false
+	END AS exists
+`,
+		enum,
+		val,
+	)
+}
+
+) (bool, error) {
+	return og.scanBool(
+		ctx,
+		tx,
+		`
+SELECT
+	json_array_length(
+		COALESCE(
+			crdb_internal.pb_to_json(
+				'cockroach.sql.sqlbase.Descriptor',
+				descriptor
+			)->'table'->'mutations',
+			'[]'
+		)
+	)
+	> 0
+FROM
+	system.descriptor
+WHERE
+	id = $1::REGCLASS;
+		`,
+		tableName.String(),
+	)
+}
+
+) (bool, error) {
+	return og.scanBool(
+		ctx,
+		tx,
+		`
+WITH descriptors AS (
+                    SELECT crdb_internal.pb_to_json(
+                            'cockroach.sql.sqlbase.Descriptor',
+                            descriptor
+                           )->'table' AS d
+                      FROM system.descriptor
+                     WHERE id = $1::REGCLASS
+                 ),
+     mutations AS (
+                SELECT json_array_elements(
+                        d->'mutations'
+                       ) AS m
+                  FROM descriptors
+               ),
+     primaryindex AS (
+                    SELECT d->'primaryIndex' AS p
+                      FROM descriptors
+                  )
+		 -- Check for legacy primary key swaps which exist as mutations
+     SELECT EXISTS(
+                SELECT mut
+                  FROM (
+                        SELECT json_array_elements(
+                                d->'mutations'
+                               ) AS mut
+                          FROM descriptors
+                       )
+                 WHERE (mut->'primaryKeySwap') IS NOT NULL
+		 -- Check for declarative primary key swaps, which will appear as
+		 -- as new primary indexes with different key columns
+     UNION SELECT p
+             FROM primaryindex AS pk, mutations AS mut
+            WHERE m->'index'->'encodingType' = '1'::JSONB
+                  AND m->'index'->'keyColumnIds'
+                    != p->'keyColumnIds'
+			);
+		`,
+		tableName.String(),
+	)
+}
+
+) (tree.Name, error) {
+	isTableRegionalByRow, err := og.tableIsRegionalByRow(ctx, tx, tableName)
+	if err != nil {
+		return "", err
+	}
+	if !isTableRegionalByRow {
+		return "", errors.AssertionFailedf(
+			"invalid call to get region column of table %s which is not a REGIONAL BY ROW table",
+			tableName.String())
+	}
+
+	regionCol, err := Scan[string](ctx, og, tx, `
+WITH
+	descriptors
+		AS (
+			SELECT
+				crdb_internal.pb_to_json(
+					'cockroach.sql.sqlbase.Descriptor',
+					descriptor
+				)->'table'
+					AS d
+			FROM
+				system.descriptor
+			WHERE
+				id = $1::REGCLASS
+		)
+SELECT
+	COALESCE (d->'localityConfig'->'regionalByRow'->>'as', $2)
+FROM
+	descriptors;
+`,
+		tableName.String(),
+		tree.RegionalByRowRegionDefaultCol,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	return tree.Name(regionCol), nil
+}
+
+) (bool, error) {
+	return og.scanBool(
+		ctx,
+		tx,
+		`
+WITH
+	descriptors
+		AS (
+			SELECT
+				crdb_internal.pb_to_json(
+					'cockroach.sql.sqlbase.Descriptor',
+					descriptor
+				)->'table'
+					AS d
+			FROM
+				system.descriptor
+			WHERE
+				id = $1::REGCLASS
+		)
+SELECT
+	EXISTS(
+		SELECT
+			1
+		FROM
+			descriptors
+		WHERE
+			d->'localityConfig'->'regionalByRow' IS NOT NULL
+	);
+		`,
+		tableName.String(),
+	)
+} And here is the function you are asked to complete func (og *operationGenerator) databaseIsMultiRegion((ctx context.Context, tx pgx.Tx)) ((bool, error))
+func (og *operationGenerator) databaseIsMultiRegion(ctx context.Context, tx pgx.Tx) (bool, error) {
+	return og.scanBool(
+		ctx, <MID> } Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

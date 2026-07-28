@@ -730,20 +730,32 @@ class NewInferenceFunction:
             trimmed_ids[i, :tlen] = input_ids[i, :tlen]
             trimmed_mask[i, :tlen] = 1
 
-        if not isinstance(self.model, GenerationMixin):
-            raise ValueError("Expect self.model to be GenerationMixin")
+        # PeftModel wraps CausalLM and exposes .generate(), but is often not a
+        # GenerationMixin subclass — so do not require isinstance(..., GenerationMixin).
+        if not hasattr(self.model, "generate") or not callable(getattr(self.model, "generate")):
+            raise ValueError("Expect self.model to support .generate()")
 
-        # Part 2: generation sequence inference, saliency on generated sequence
-
+        # Part 2: generation — match viz/precompute._free_run (neutral greedy).
+        # Qwen generation_config ships repetition_penalty=1.1; even with do_sample=False
+        # that can flip the argmax vs raw logits. Viz forces 1.0 so free-run == belief.
+        _im_end = self.tokenizer.convert_tokens_to_ids("<|im_end|>")
+        _eos_ids = sorted({
+            i for i in [self.tokenizer.eos_token_id, _im_end] if i is not None
+        })
         gen_out = self.model.generate(
             input_ids=trimmed_ids,
             attention_mask=trimmed_mask,
             max_new_tokens=gen_limit,
             do_sample=False,
-            eos_token_id=[self.tokenizer.eos_token_id, self.tokenizer.pad_token_id],
-            pad_token_id=self.tokenizer.pad_token_id,
+            num_beams=1,
+            repetition_penalty=1.0,
+            temperature=1.0,
+            top_p=1.0,
+            eos_token_id=_eos_ids,
+            pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
             return_dict_in_generate=True,
-            output_scores=True
+            output_scores=True,
+            use_cache=True,
         )
 
         if not isinstance(gen_out, GenerateDecoderOnlyOutput):

@@ -1,0 +1,1 @@
+		if err := s.checkType(ord.ColIdx, types[ord.ColIdx], nextChunkRow[ord.DatumIdx], prefix[ord.DatumIdx

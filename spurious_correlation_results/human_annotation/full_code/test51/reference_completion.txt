@@ -1,0 +1,2 @@
+	invertedExpr, err := encodeContainedInvertedIndexSpansFromLeaf(j, b, isRoot)
+	return invertedExpr, err

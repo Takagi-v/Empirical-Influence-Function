@@ -1,0 +1,3 @@
+			if !m.AssertExpectations(t) {
+				t.Logf("Expectations didn't match forMock: %+v", reflect.TypeOf(m))
+				return false

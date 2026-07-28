@@ -1,0 +1,3 @@
+	h.h.Lock()
+	defer h.h.Unlock()
+	h.h.Add(value)

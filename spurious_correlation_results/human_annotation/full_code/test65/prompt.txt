@@ -1,0 +1,99 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/kubernetes/Kubernetes/vendor/github.com/json-iterator/go Below is the code repository: github.com/kubernetes/Kubernetes/ Below is the imported package path "reflect"; "unsafe" The receiver struct definitions of the function is type objectLazyAny struct {
+	baseAny
+	cfg *frozenConfig
+	buf []byte
+	err error
+}
+
+// Methods:
+- func (any *objectLazyAny) ValueType() ValueType
+- func (any *objectLazyAny) MustBeValid() Any
+- func (any *objectLazyAny) LastError() error
+- func (any *objectLazyAny) ToBool() bool
+- func (any *objectLazyAny) ToInt() int
+- func (any *objectLazyAny) ToInt32() int32
+- func (any *objectLazyAny) ToInt64() int64
+- func (any *objectLazyAny) ToUint() uint
+- func (any *objectLazyAny) ToUint32() uint32
+- func (any *objectLazyAny) ToUint64() uint64
+- func (any *objectLazyAny) ToFloat32() float32
+- func (any *objectLazyAny) ToFloat64() float64
+- func (any *objectLazyAny) ToString() string
+- func (any *objectLazyAny) ToVal(obj *ast.InterfaceType)
+- func (any *objectLazyAny) Get(path *ast.Ellipsis) Any
+- func (any *objectLazyAny) Keys() *ast.ArrayType
+- func (any *objectLazyAny) Size() int
+- func (any *objectLazyAny) WriteTo(stream *Stream)
+- func (any *objectLazyAny) GetInterface() *ast.InterfaceType
+ The parameter struct definition or not exist of the function is not exist The return value struct definitions or not exist of the function is *ast.InterfaceType The code snippets before the function is func (any *objectLazyAny) ToVal(obj interface{}) {
+	iter := any.cfg.BorrowIterator(any.buf)
+	defer any.cfg.ReturnIterator(iter)
+	iter.ReadVal(obj)
+}
+
+func (any *objectLazyAny) Get(path ...interface{}) Any {
+	if len(path) == 0 {
+		return any
+	}
+	switch firstPath := path[0].(type) {
+	case string:
+		iter := any.cfg.BorrowIterator(any.buf)
+		defer any.cfg.ReturnIterator(iter)
+		valueBytes := locateObjectField(iter, firstPath)
+		if valueBytes == nil {
+			return newInvalidAny(path)
+		}
+		iter.ResetBytes(valueBytes)
+		return locatePath(iter, path[1:])
+	case int32:
+		if '*' == firstPath {
+			mappedAll := map[string]Any{}
+			iter := any.cfg.BorrowIterator(any.buf)
+			defer any.cfg.ReturnIterator(iter)
+			iter.ReadMapCB(func(iter *Iterator, field string) bool {
+				mapped := locatePath(iter, path[1:])
+				if mapped.ValueType() != InvalidValue {
+					mappedAll[field] = mapped
+				}
+				return true
+			})
+			return wrapMap(mappedAll)
+		}
+		return newInvalidAny(path)
+	default:
+		return newInvalidAny(path)
+	}
+}
+
+func (any *objectLazyAny) Keys() []string {
+	keys := []string{}
+	iter := any.cfg.BorrowIterator(any.buf)
+	defer any.cfg.ReturnIterator(iter)
+	iter.ReadMapCB(func(iter *Iterator, field string) bool {
+		iter.Skip()
+		keys = append(keys, field)
+		return true
+	})
+	return keys
+}
+
+func (any *objectLazyAny) Size() int {
+	size := 0
+	iter := any.cfg.BorrowIterator(any.buf)
+	defer any.cfg.ReturnIterator(iter)
+	iter.ReadObjectCB(func(iter *Iterator, field string) bool {
+		iter.Skip()
+		size++
+		return true
+	})
+	return size
+}
+
+func (any *objectLazyAny) WriteTo(stream *Stream) {
+	stream.Write(any.buf)
+} And here is the function you are asked to complete func (any *objectLazyAny) GetInterface() *ast.InterfaceType
+func (any *objectLazyAny) GetInterface() interface{} { <MID> } Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

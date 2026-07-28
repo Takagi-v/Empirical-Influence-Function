@@ -40,6 +40,7 @@ set -uo pipefail   # -e intentionally omitted: one sample failing won't stop the
 # Default configuration (override via flags or env vars)
 # ---------------------------------------------------------------------------
 MODEL_PATH="${MODEL_PATH:-}"
+BASE_MODEL_PATH="${BASE_MODEL_PATH:-}"
 TRAIN_DATA="${TRAIN_DATA:-sft_train.jsonl}"
 TEST_DATA="${TEST_DATA:-sft_test.jsonl}"
 INDICES="${INDICES:-}"        # comma/space-separated explicit test sample indices
@@ -58,7 +59,8 @@ TOP_TARGETS="${TOP_TARGETS:-}"  # empty = intervention default
 TOP_K_SOURCE_PER_TARGET="${TOP_K_SOURCE_PER_TARGET:-}"  # empty = intervention default
 PRESCREEN_SKETCH_DIM="${PRESCREEN_SKETCH_DIM:-}"  # empty = intervention default; <=0 disables cache
 PRESCREEN_SKETCH_SEED="${PRESCREEN_SKETCH_SEED:-}"  # empty = intervention default
-PRESCREEN_SKETCH_CACHE_DIR="${PRESCREEN_SKETCH_CACHE_DIR:-}"  # empty = intervention default
+PRESCREEN_SKETCH_CACHE_DIR="${PRESCREEN_SKETCH_CACHE_DIR:-}"  # legacy CE cache (unused)
+SALIENCY_TRAIN_BANK_CACHE_DIR="${SALIENCY_TRAIN_BANK_CACHE_DIR:-}"  # empty = .cache/saliency_train_bank
 IE_EXTRA_ARGS="${IE_EXTRA_ARGS:-}"  # optional raw passthrough args
 PYTHON="${PYTHON:-python}"
 
@@ -68,6 +70,7 @@ PYTHON="${PYTHON:-python}"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --model-path) MODEL_PATH="$2";  shift 2 ;;
+        --base-model-path) BASE_MODEL_PATH="$2"; shift 2 ;;
         --train-data) TRAIN_DATA="$2";  shift 2 ;;
         --test-data)  TEST_DATA="$2";   shift 2 ;;
         --indices)    INDICES="$2";     shift 2 ;;
@@ -87,6 +90,7 @@ while [[ $# -gt 0 ]]; do
         --prescreen-sketch-dim) PRESCREEN_SKETCH_DIM="$2"; shift 2 ;;
         --prescreen-sketch-seed) PRESCREEN_SKETCH_SEED="$2"; shift 2 ;;
         --prescreen-sketch-cache-dir) PRESCREEN_SKETCH_CACHE_DIR="$2"; shift 2 ;;
+        --saliency-train-bank-cache-dir) SALIENCY_TRAIN_BANK_CACHE_DIR="$2"; shift 2 ;;
         *) echo "[batch] Unknown option: $1"; exit 1 ;;
     esac
 done
@@ -165,9 +169,21 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="${ROOT_DIR}/logs/batch_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "${LOG_DIR}"
 
+# Derive model tag the same way as intervention_experiment.model_tag_from_path
+MODEL_TAG="$(python3 - "$MODEL_PATH" <<'PYEOF'
+import os, re, sys
+path = sys.argv[1]
+tag = os.path.basename(os.path.normpath(path)).strip()
+tag = re.sub(r"[^\w.\-]+", "_", tag).strip("._") or "model"
+print(tag)
+PYEOF
+)"
+
 echo "================================================================="
 echo "  Batch Experiment Runner  (all-tokens mode)"
 echo "  model     : ${MODEL_PATH}"
+echo "  base model: ${BASE_MODEL_PATH:-auto-resolve if adapter}"
+echo "  model_tag : ${MODEL_TAG}  (appears in result filenames)"
 echo "  train data: ${TRAIN_DATA}"
 echo "  test data : ${TEST_DATA}  (${TOTAL} samples)"
 if [[ -n "$INDICES" ]]; then
@@ -182,8 +198,12 @@ echo "  max gpu memory: ${MAX_GPU_MEMORY:-auto}"
 echo "  fine match proj: ${FINE_MATCH_PROJ:-qk}"
 echo "  alti grad chunk: ${ALTI_GRAD_CHUNK_SIZE:-default}"
 echo "  prescreen batch size: ${PRESCREEN_BATCH_SIZE:-1}"
-echo "  prescreen sketch dim: ${PRESCREEN_SKETCH_DIM:-8192}"
-echo "  prescreen sketch cache: ${PRESCREEN_SKETCH_CACHE_DIR:-.cache/prescreen_sketch}"
+echo "  sketch dim: ${PRESCREEN_SKETCH_DIM:-8192}"
+echo "  stage3 train targets: ${TOP_TARGETS:-all}  (first K valid answer tokens; empty=all)"
+echo "  stage3 sources/target: ${TOP_K_SOURCE_PER_TARGET:-3}"
+echo "  saliency train bank: ${SALIENCY_TRAIN_BANK_CACHE_DIR:-.cache/saliency_train_bank}"
+echo "  legacy CE sketch (unused): ${PRESCREEN_SKETCH_CACHE_DIR:-.cache/prescreen_sketch}"
+echo "  result pattern: correlation_matching_results_${MODEL_TAG}_<task_id>_all_tokens.json"
 echo "  log dir   : ${LOG_DIR}"
 echo "================================================================="
 
@@ -197,22 +217,25 @@ FAILED_INDICES=()
 
 for IDX in "${VALID_RUN_INDICES[@]}"; do
     TASK_ID="${TASK_IDS[$IDX]}"
-    RESULT_FILE="${ROOT_DIR}/correlation_matching_results_${TASK_ID}_all_tokens.json"
+    RESULT_FILE="${ROOT_DIR}/correlation_matching_results_${MODEL_TAG}_${TASK_ID}_all_tokens.json"
+    # Backward compatible: also skip if old filename without model tag exists
+    LEGACY_RESULT_FILE="${ROOT_DIR}/correlation_matching_results_${TASK_ID}_all_tokens.json"
 
     # Resume: skip if result already exists
-    if [[ -f "$RESULT_FILE" ]]; then
-        echo "[$(date +%H:%M:%S)] [${IDX}/${END_IDX}] SKIP  ${TASK_ID}  (result exists)"
+    if [[ -f "$RESULT_FILE" || -f "$LEGACY_RESULT_FILE" ]]; then
+        echo "[$(date +%H:%M:%S)] [${IDX}/${END_IDX}] SKIP  ${MODEL_TAG}/${TASK_ID}  (result exists)"
         N_SKIP=$((N_SKIP + 1))
         continue
     fi
 
     echo ""
-    echo "[$(date +%H:%M:%S)] [${IDX}/${END_IDX}] START  task_id=${TASK_ID}"
+    echo "[$(date +%H:%M:%S)] [${IDX}/${END_IDX}] START  model=${MODEL_TAG} task_id=${TASK_ID}"
 
-    LOG_FILE="${LOG_DIR}/${TASK_ID}.log"
+    LOG_FILE="${LOG_DIR}/${MODEL_TAG}_${TASK_ID}.log"
 
     "${PYTHON}" -m src.intervention_experiment \
         --model-path  "${MODEL_PATH}" \
+        ${BASE_MODEL_PATH:+--base-model-path "${BASE_MODEL_PATH}"} \
         --train-data  "${TRAIN_DATA}" \
         --test-data   "${TEST_DATA}"  \
         --test-index  "${IDX}"        \
@@ -230,6 +253,7 @@ for IDX in "${VALID_RUN_INDICES[@]}"; do
         ${PRESCREEN_SKETCH_DIM:+--prescreen-sketch-dim "${PRESCREEN_SKETCH_DIM}"} \
         ${PRESCREEN_SKETCH_SEED:+--prescreen-sketch-seed "${PRESCREEN_SKETCH_SEED}"} \
         ${PRESCREEN_SKETCH_CACHE_DIR:+--prescreen-sketch-cache-dir "${PRESCREEN_SKETCH_CACHE_DIR}"} \
+        ${SALIENCY_TRAIN_BANK_CACHE_DIR:+--saliency-train-bank-cache-dir "${SALIENCY_TRAIN_BANK_CACHE_DIR}"} \
         ${IE_EXTRA_ARGS} \
         2>&1 | tee "${LOG_FILE}"
 
@@ -259,6 +283,6 @@ if [[ ${#FAILED_INDICES[@]} -gt 0 ]]; then
     echo ""
     echo "  Logs for failed samples are in: ${LOG_DIR}/"
 fi
-echo "  Results : ${ROOT_DIR}/correlation_matching_results_test*_all_tokens.json"
+echo "  Results : ${ROOT_DIR}/correlation_matching_results_<model>_*_all_tokens.json"
 echo "  Logs    : ${LOG_DIR}/"
 echo "================================================================="

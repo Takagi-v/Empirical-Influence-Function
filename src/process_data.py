@@ -14,9 +14,10 @@ from tqdm import tqdm
 import re
 import os
 import numpy as np
-from tree_sitter import Language, Parser
-import tree_sitter_go as tsgo # pip install tree-sitter tree-sitter-go
-from tree_sitter import QueryCursor
+
+# tree_sitter is only needed by local Go AST helpers under __main__.
+# Keep it out of the module import path so intervention_experiment can run
+# with older tree_sitter builds that lack QueryCursor.
 
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 os.environ["HF_HOME"]="/mnt/nvme0n1/hf_hub"
@@ -228,9 +229,10 @@ if __name__ == '__main__':
     #                 output = obj['messages'][2]['content']
     #                 print()
 
-    # 测试用例
+    # 测试用例（optional local dependency）
+    from tree_sitter import Language, Parser
+    import tree_sitter_go as tsgo
 
-    # 初始化 Parser
     GO_LANGUAGE = Language(tsgo.language())
     parser = Parser(GO_LANGUAGE)
     example_code = """

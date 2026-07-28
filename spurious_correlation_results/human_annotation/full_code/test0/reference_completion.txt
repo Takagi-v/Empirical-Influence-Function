@@ -1,0 +1,3 @@
+	config := adapter.stream.cfg.configBeforeFrozen
+	config.IndentionStep = len(indent)
+	adapter.stream.cfg = config.frozeWithCacheReuse(adapter.stream.cfg.extraExtensions)

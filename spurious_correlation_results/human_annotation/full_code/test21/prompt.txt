@@ -1,0 +1,29 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/urfave/cli Below is the code repository: github.com/urfave/cli/ Below is the imported package path "strconv"; "unsafe" The receiver struct definitions of the function is not exist The parameter struct definition or not exist of the function is (cmd *Command, name string) The return value struct definitions or not exist of the function is T The code snippets before the function is func (cmd *Command) Uint(name string) uint {
+	return getUint[uint](cmd, name)
+}
+
+func (cmd *Command) Uint8(name string) uint8 {
+	return getUint[uint8](cmd, name)
+}
+
+func (cmd *Command) Uint16(name string) uint16 {
+	return getUint[uint16](cmd, name)
+}
+
+func (cmd *Command) Uint32(name string) uint32 {
+	return getUint[uint32](cmd, name)
+}
+
+func (cmd *Command) Uint64(name string) uint64 {
+	return getUint[uint64](cmd, name)
+} And here is the function you are asked to complete func getUint((cmd *Command, name string)) T
+func getUint[T uint | uint8 | uint16 | uint32 | uint64](cmd *Command, name string) T {
+	if v, ok := cmd.Value(name).(T); ok { <MID> 	}
+
+	tracef("uint NOT available for flag name %[1]q (cmd=%[2]q)", name, cmd.Name)
+	return 0
+} Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

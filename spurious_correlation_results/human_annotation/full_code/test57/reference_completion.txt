@@ -1,0 +1,5 @@
+		disabledAt := time.Unix(t.reshardDisableStartTimestamp.Load(), 0)
+		disabledFor := time.Until(time.Unix(disableTimestamp, 0))
+
+		t.logger.Warn("Skipping resharding, resharding is disabled while waiting for recoverable errors", "disabled_at", disabledAt, "disabled_for", disabledFor)
+		return false

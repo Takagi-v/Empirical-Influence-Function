@@ -1,0 +1,3 @@
+  ## Default value is 'true' for backwards compatibility, please set it to 'false' so that 'perdevice_include' setting
+  ## is honored.
+  perdevice = true

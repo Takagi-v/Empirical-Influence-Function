@@ -1,0 +1,4 @@
+		return typedValue{
+			typ:   reflectTypeType,
+			value: typ,
+		}, nil

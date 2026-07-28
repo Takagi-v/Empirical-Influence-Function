@@ -1,0 +1,3 @@
+				lintCtx.Log.Errorf("invalid configuration, multiple aliases for the same package: pkg=%s aliases=[%s,%s]", a.Pkg, a.Alias, v.Alias)
+			} else {
+				uniqPackages[a.Pkg] = a

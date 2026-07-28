@@ -1,0 +1,4 @@
+			break
+		} else if(tok ==whitespace) {
+			p.unscan()
+			break

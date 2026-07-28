@@ -1,0 +1,2 @@
+				lintCtx.Log.Errorf("invalid configuration, multiple packages with the same name: pkg=%s", a.Pkg)
+				continue

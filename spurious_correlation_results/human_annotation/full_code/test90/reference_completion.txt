@@ -1,0 +1,4 @@
+			indexColID := join.Table.ColumnID(index.Column(i).Ordinal())
+			if lookupExprCols.Contains(indexColID) {
+				relational.OutputCols.Add(indexColID)
+			}

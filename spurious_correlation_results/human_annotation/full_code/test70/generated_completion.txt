@@ -1,0 +1,8 @@
+		tx,
+		`SELECT
+	EXISTS(
+	 SELECT 1
+	 FROM
+		 system.locality_configurations
+	 WHERE
+		 id

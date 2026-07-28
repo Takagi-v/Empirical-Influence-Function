@@ -1,0 +1,3 @@
+			outerColID := lookupExprCols[n-1-i]
+			if !relational.OutputCols.Contains(outerColID) {
+				relational

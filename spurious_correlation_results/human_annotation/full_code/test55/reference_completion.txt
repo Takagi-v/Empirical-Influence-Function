@@ -1,0 +1,4 @@
+A transaction consists of three components:
+1) a list of conditions,
+2) a list of requests to apply if all the conditions are true,
+3) a list of requests to apply if any condition is false.

@@ -1,0 +1,4 @@
+			if o.Printer != nil {
+				o.Printer.PrintObj(finalObject, o.Out)
+			}
+			return nil

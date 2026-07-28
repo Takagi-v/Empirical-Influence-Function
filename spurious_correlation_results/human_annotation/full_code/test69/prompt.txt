@@ -1,0 +1,65 @@
+<|im_start|>system
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+<|im_start|>user
+This is a go programming task on some code contents. Given task: The task is to fill in the missing part of a go function according to the provided code   content. Below is the package path:github.com/cockroachdb/cockroach/pkg/kv/kvserver/logstore Below is the code repository: github.com/cockroachdb/cockroach/ Below is the imported package path "context"; "fmt"; "os"; "path/filepath"; "strconv"; "strings"; "github.com/cockroachdb/cockroach/pkg/kv/kvpb"; "github.com/cockroachdb/cockroach/pkg/kv/kvserver/kvserverbase"; "github.com/cockroachdb/cockroach/pkg/roachpb"; "github.com/cockroachdb/cockroach/pkg/settings/cluster"; "github.com/cockroachdb/cockroach/pkg/storage/fs"; "github.com/cockroachdb/cockroach/pkg/util/log"; "github.com/cockroachdb/errors"; "github.com/cockroachdb/errors/oserror"; "github.com/cockroachdb/pebble/vfs"; "golang.org/x/time/rate" The receiver struct definitions of the function is type DiskSideloadStorage struct {
+	st      *cluster.Settings
+	limiter *rate.Limiter
+	dir     string
+	fs      *fs.Env
+}
+
+// Methods:
+- func (ss *DiskSideloadStorage) Dir() string
+- func (ss *DiskSideloadStorage) Put((ctx context.Context, index kvpb.RaftIndex, term kvpb.RaftTerm, contents *ast.ArrayType)) error
+- func (ss *DiskSideloadStorage) Sync() error
+- func (ss *DiskSideloadStorage) Get((ctx context.Context, index kvpb.RaftIndex, term kvpb.RaftTerm)) ((*ast.ArrayType, error))
+- func (ss *DiskSideloadStorage) Filename((ctx context.Context, index kvpb.RaftIndex, term kvpb.RaftTerm)) ((string, error))
+- func (ss *DiskSideloadStorage) filename((ctx context.Context, index kvpb.RaftIndex, term kvpb.RaftTerm)) string
+- func (ss *DiskSideloadStorage) Purge((ctx context.Context, index kvpb.RaftIndex, term kvpb.RaftTerm)) ((int64, error))
+- func (ss *DiskSideloadStorage) fileSize(filename string) ((int64, error))
+- func (ss *DiskSideloadStorage) purgeFile((ctx context.Context, filename string)) ((int64, error))
+- func (ss *DiskSideloadStorage) Clear(_ context.Context) error
+- func (ss *DiskSideloadStorage) TruncateTo((ctx context.Context, lastIndex kvpb.RaftIndex)) error
+- func (ss *DiskSideloadStorage) Stats((ctx context.Context, span kvpb.RaftSpan)) ((entries uint64, size int64, _ error))
+- func (ss *DiskSideloadStorage) forEach((ctx context.Context, visit *ast.FuncType)) error
+- func (ss *DiskSideloadStorage) String() string
+ The parameter struct definition or not exist of the function is (ctx context.Context, filename string) The return value struct definitions or not exist of the function is (int64, error) The code snippets before the function is ) ([]byte, error) {
+	filename := ss.filename(ctx, index, term)
+	b, err := fs.ReadFile(ss.fs, filename)
+	if oserror.IsNotExist(err) {
+		return nil, errSideloadedFileNotFound
+	}
+	return b, err
+}
+
+) (string, error) {
+	return ss.filename(ctx, index, term), nil
+}
+
+) string {
+	return filepath.Join(ss.dir, fmt.Sprintf("i%d.t%d", index, term))
+}
+
+) (int64, error) {
+	return ss.purgeFile(ctx, ss.filename(ctx, index, term))
+}
+
+func (ss *DiskSideloadStorage) fileSize(filename string) (int64, error) {
+	info, err := ss.fs.Stat(filename)
+	if err != nil {
+		if oserror.IsNotExist(err) {
+			return 0, errSideloadedFileNotFound
+		}
+		return 0, err
+	}
+	return info.Size(), nil
+} And here is the function you are asked to complete func (ss *DiskSideloadStorage) purgeFile((ctx context.Context, filename string)) ((int64, error))
+func (ss *DiskSideloadStorage) purgeFile(ctx context.Context, filename string) (int64, error) {
+	size, err := ss.fileSize(filename)
+	if err != nil {
+		return 0, err
+	}
+	if err := ss.fs.Remove(filename); err != nil { <MID> 	}
+	return size, nil
+} Ensure that only missing codes marked as <MID> are returned<|im_end|>
+<|im_start|>assistant

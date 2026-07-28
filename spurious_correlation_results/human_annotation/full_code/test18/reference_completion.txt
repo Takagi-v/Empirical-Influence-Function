@@ -1,0 +1,2 @@
+			o.Printer.PrintObj(finalObject, o.Out)
+			return nil

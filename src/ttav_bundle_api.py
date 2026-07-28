@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock
@@ -20,6 +21,15 @@ EIF_BUNDLE_CACHE_ROOT = REPO_ROOT / "ttav_bundles"
 PREGENERATED_REAL_BUNDLE_ROOT = REPO_ROOT / "ttav_bundles_real"
 PREPARE_STATUS_LOCK = Lock()
 PREPARE_STATUS: dict[str, dict] = {}
+
+# Server-side kill switch for live model loading. Independent of (and stronger
+# than) the per-request `requireCached` flag: that one is client-supplied and
+# not trustworthy — any request that omits/flips it would still fall through
+# to loading the ~7GB model on this 7.1GB-RAM box. Set EIF_CACHE_ONLY=1 (in
+# the systemd unit's Environment=, or the shell that launches the API) to make
+# every request behave as cache-only server-wide, regardless of what the
+# client sends: a cache miss returns an error instead of ever loading a model.
+CACHE_ONLY_MODE = os.environ.get("EIF_CACHE_ONLY", "").strip().lower() in ("1", "true", "yes")
 
 
 def _set_prepare_status(sample_id: str, stage: str, message: str, *, active: bool, error: bool = False):
@@ -304,7 +314,8 @@ class TTAVBundleRequestHandler(BaseHTTPRequestHandler):
         vis_id = str(req.get("visId", "1")).strip() or "1"
         selected_indices = req.get("selectedIndices", [])
         target_index = req.get("targetIndex")
-        require_cached = bool(req.get("requireCached", False))
+        client_require_cached = bool(req.get("requireCached", False))
+        require_cached = client_require_cached or CACHE_ONLY_MODE
         explicit_cache_path = str(req.get("eifBundleCachePath", "")).strip() or None
         bundle_mode = str(req.get("bundleMode", "real")).strip().lower() or "real"
         embedding_type = str(req.get("embeddingType", "contextual")).strip().lower() or "contextual"
@@ -337,11 +348,17 @@ class TTAVBundleRequestHandler(BaseHTTPRequestHandler):
                     print(f"[prepare] sampleId={resolved_sample_id} cache=mismatch", flush=True)
             if not cache_hit:
                 if require_cached:
-                    _set_prepare_status(resolved_sample_id, "error", "EIF local bundle cache not found. Prepare sample first.", active=False, error=True)
-                    self._send_json(404, {
-                        "status": "error",
-                        "message": f"EIF local bundle cache not found for sample: {resolved_sample_id}. Please prepare the sample first.",
-                    })
+                    if CACHE_ONLY_MODE and not client_require_cached:
+                        message = (
+                            f"EIF local bundle cache not found for sample: {resolved_sample_id}. "
+                            "This server has live model loading disabled (EIF_CACHE_ONLY=1); "
+                            "only precomputed bundles can be served. Precompute this sample "
+                            "elsewhere and drop it into ttav_bundles_real/ first."
+                        )
+                    else:
+                        message = f"EIF local bundle cache not found for sample: {resolved_sample_id}. Please prepare the sample first."
+                    _set_prepare_status(resolved_sample_id, "error", message, active=False, error=True)
+                    self._send_json(404, {"status": "error", "message": message})
                     return
                 _set_prepare_status(resolved_sample_id, "building_bundle", "Building TTAV bundle from EIF report", active=True)
                 payload = _build_requested_payload(
@@ -442,6 +459,20 @@ class TTAVBundleRequestHandler(BaseHTTPRequestHandler):
             return
         if not isinstance(probe_pairs, list) or not probe_pairs:
             self._send_json(400, {"status": "error", "message": "probePairs is required"})
+            return
+
+        if CACHE_ONLY_MODE:
+            # This handler has no cache path at all (unlike /prepare-ttav-bundle) —
+            # it always loads the model. Under the server-wide switch there's
+            # nothing to fall back to, so refuse outright rather than load.
+            self._send_json(503, {
+                "status": "error",
+                "message": (
+                    "This server has live model loading disabled (EIF_CACHE_ONLY=1); "
+                    "train-sample probes always require loading the model and have no "
+                    "precomputed fallback, so this request cannot be served here."
+                ),
+            })
             return
 
         base_sample_id = str(req.get("sampleId", "")).strip() or infer_sample_id(str(report_json_path))
@@ -554,6 +585,7 @@ def main():
 
     httpd = ThreadingHTTPServer((args.host, args.port), TTAVBundleRequestHandler)
     print(f"EIF TTAV bundle API listening on http://{args.host}:{args.port}", flush=True)
+    print(f"CACHE_ONLY_MODE={'ON — live model loading disabled server-wide' if CACHE_ONLY_MODE else 'off'}", flush=True)
     httpd.serve_forever()
 
 

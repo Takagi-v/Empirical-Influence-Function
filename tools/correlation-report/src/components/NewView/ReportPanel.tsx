@@ -617,22 +617,25 @@ function resolveContentPath(template: string, sampleId: string): string {
 }
 
 function inferSampleIdFromMeta(meta: AllTokensExperimentMeta, report?: AllTokensReport | null): string {
-    if (report?.experiment_meta.task_id) {
-        return report.experiment_meta.task_id;
-    }
+    // Same regex as infer_sample_id() in src/export_ttav_bundle.py — must stay in
+    // sync so the id the frontend asks for matches the directory name the backend
+    // actually wrote to ttav_bundles/ and ttav_bundles_real/. Non-greedy on the
+    // first group so it captures the full "{model}_{task}" prefix (e.g.
+    // "ce_only_codesearchnet_go_test_...") while still handling legacy filenames
+    // with a trailing suffix after "_all_tokens" (e.g. "..._all_tokens_new.json").
     const fileStem = meta.fileName.replace(/\.json$/i, '');
-    const modelName = report?.experiment_meta.model_name;
-    if (modelName) {
-        const prefix = `correlation_matching_results_${modelName}_`;
-        const suffix = '_all_tokens';
-        if (fileStem.startsWith(prefix) && fileStem.endsWith(suffix)) {
-            return fileStem.slice(prefix.length, -suffix.length);
-        }
+    const match = fileStem.match(/^correlation_matching_results_(.+?)_all_tokens(?:_(.+))?$/);
+    if (match) {
+        const [, prefix, suffix] = match;
+        return suffix ? `${prefix}_${suffix}` : prefix;
     }
-    // Legacy: correlation_matching_results_{task}_all_tokens
-    const matchLegacy = fileStem.match(/^correlation_matching_results_(.+)_all_tokens$/);
-    if (matchLegacy) {
-        return matchLegacy[1];
+    // report.experiment_meta.task_id is model-agnostic (model lives separately in
+    // model_name) — only safe to use as a last resort when the filename doesn't
+    // follow the expected convention at all, since using it directly would drop
+    // the model prefix and collide ce_only/ce_saliency bundles for the same task.
+    if (report?.experiment_meta.task_id) {
+        const modelName = report.experiment_meta.model_name;
+        return modelName ? `${modelName}_${report.experiment_meta.task_id}` : report.experiment_meta.task_id;
     }
     return meta.taskId || meta.label || (report ? `test${report.experiment_meta.test_sample_index}` : fileStem);
 }

@@ -5,7 +5,10 @@ const TTAV_PREFS_KEY = 'eif:ttav-launch-prefs';
 const TTAV_PREPARED_BUNDLES_KEY = 'eif:ttav-prepared-bundles';
 const DEFAULT_TTAV_URL = 'http://1.94.115.154/';
 const DEFAULT_TTAV_CONTENT_PATH_TEMPLATE = '/root/project/Dataset/eif_bundles/{sampleId}';
-const DEFAULT_EIF_BUNDLE_CACHE_TEMPLATE = '/home/yilu/workspace/Empirical-Influence-Function/ttav_bundles/{sampleId}';
+// Empty by default: let the EIF bundle API resolve its own on-server cache
+// directory (ttav_bundles/{sampleId} relative to its repo root) instead of a
+// hardcoded absolute path that only exists on one developer's machine.
+const DEFAULT_EIF_BUNDLE_CACHE_TEMPLATE = '';
 const DEFAULT_TTAV_METHOD = 'TimeVis';
 const DEFAULT_TTAV_VIS_ID = '1';
 function getDefaultEifApiUrl(): string {
@@ -13,10 +16,11 @@ function getDefaultEifApiUrl(): string {
         return 'http://127.0.0.1:8766/api/prepare-ttav-bundle';
     }
 
-    const protocol = window.location.protocol || 'http:';
-    const hostname = window.location.hostname || '127.0.0.1';
-    const port = hostname === 'localhost' || hostname === '127.0.0.1' ? '8766' : '8765';
-    return `${protocol}//${hostname}:${port}/api/prepare-ttav-bundle`;
+    // Same-origin: the /api/* path is reverse-proxied to the EIF bundle API
+    // (127.0.0.1:8766) by the page server (vite dev/preview proxy, or nginx).
+    // Using window.location.origin avoids port-mismatch and mixed-content issues
+    // in VS Code forwarded-localhost and public-nginx setups alike.
+    return `${window.location.origin}/api/prepare-ttav-bundle`;
 }
 
 const DEFAULT_EIF_API_URL = getDefaultEifApiUrl();

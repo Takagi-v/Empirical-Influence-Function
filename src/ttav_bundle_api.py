@@ -163,14 +163,17 @@ def _make_probe_sample_id(
     probe_pairs: list[dict],
     context_radius: int,
     include_full_train: bool,
-    focus_train_indices: list[int] | None,
 ) -> str:
+    # focus_train_indices is deliberately NOT part of this signature: it only
+    # controls which points get highlighted/selected in the UI, not which points
+    # are in the bundle or what their embeddings are. Including it meant every
+    # checkbox toggle produced a different cache key, so a cached (or
+    # precomputed) probe could never be reused.
     signature = json.dumps(
         {
             "trainSampleId": train_sample_id,
             "contextRadius": context_radius,
             "includeFullTrain": include_full_train,
-            "focusTrainIndices": [int(idx) for idx in (focus_train_indices or [])],
             "pairs": [
                 {
                     "id": pair.get("id"),
@@ -188,8 +191,45 @@ def _make_probe_sample_id(
     return f"{base_sample_id}_train{train_sample_id}_probe_{digest}"
 
 
+def _stable_probe_sample_id(base_sample_id: str, train_sample_id: int) -> str:
+    """Parameter-independent probe id, used to look up precomputed bundles.
+
+    Precomputed probes are produced on another machine that can't reproduce this
+    server's request-dependent hash, so they're stored under a name derived only
+    from (base sample, train sample) — the same id build_train_probe_bundle_payload
+    puts in the payload. For the "Open Full Probe" flow those two ids describe the
+    same point set anyway (all train tokens + the pairs' test tokens).
+    """
+    return f"{base_sample_id}_train{train_sample_id}_probe"
+
+
 def _default_probe_cache_path(base_sample_id: str, train_sample_id: int, probe_sample_id: str) -> str:
     return str(EIF_BUNDLE_CACHE_ROOT / "probes" / base_sample_id / f"train_{train_sample_id}" / probe_sample_id)
+
+
+def _find_cached_probe_payload(
+    base_sample_id: str,
+    train_sample_id: int,
+    explicit_cache_path: str,
+) -> tuple[dict, str] | None:
+    """Look for an already-built probe bundle, newest-wins: this server's own
+    cache first, then a bundle precomputed elsewhere and dropped into
+    ttav_bundles_real/. Returns (payload, source) or None."""
+    candidates = [
+        (Path(explicit_cache_path) / "bundle_payload.json", "local_cache"),
+        (
+            PREGENERATED_REAL_BUNDLE_ROOT / _stable_probe_sample_id(base_sample_id, train_sample_id) / "bundle_payload.json",
+            "pregenerated",
+        ),
+    ]
+    for path, source in candidates:
+        if not path.exists():
+            continue
+        try:
+            return json.loads(path.read_text(encoding="utf-8")), source
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"[probe] ignoring unreadable cache {path}: {exc}", flush=True)
+    return None
 
 
 def _payload_matches_request(payload: dict, bundle_mode: str, embedding_type: str, model_path: str | None) -> bool:
@@ -461,20 +501,6 @@ class TTAVBundleRequestHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"status": "error", "message": "probePairs is required"})
             return
 
-        if CACHE_ONLY_MODE:
-            # This handler has no cache path at all (unlike /prepare-ttav-bundle) —
-            # it always loads the model. Under the server-wide switch there's
-            # nothing to fall back to, so refuse outright rather than load.
-            self._send_json(503, {
-                "status": "error",
-                "message": (
-                    "This server has live model loading disabled (EIF_CACHE_ONLY=1); "
-                    "train-sample probes always require loading the model and have no "
-                    "precomputed fallback, so this request cannot be served here."
-                ),
-            })
-            return
-
         base_sample_id = str(req.get("sampleId", "")).strip() or infer_sample_id(str(report_json_path))
         context_radius = int(req.get("contextRadius", 1))
         include_full_train = bool(req.get("includeFullTrain", False))
@@ -491,7 +517,6 @@ class TTAVBundleRequestHandler(BaseHTTPRequestHandler):
             probe_pairs,
             context_radius,
             include_full_train,
-            focus_train_indices,
         )
         explicit_cache_path = str(req.get("probeCachePath", "")).strip() or _default_probe_cache_path(base_sample_id, train_sample_id, probe_sample_id)
         status_key = probe_sample_id
@@ -503,28 +528,53 @@ class TTAVBundleRequestHandler(BaseHTTPRequestHandler):
         )
 
         try:
-            _set_prepare_status(status_key, "building_probe", "Building train-sample embedding probe", active=True)
-            payload = build_train_probe_bundle_payload(
-                report_json_path=str(report_json_path),
-                model_path=model_path,
-                train_sample_id=train_sample_id,
-                probe_pairs=probe_pairs,
-                sample_id=base_sample_id,
-                embedding_type="contextual",
-                hidden_layer=-1,
-                vis_method=vis_method,
-                vis_id=vis_id,
-                context_radius=context_radius,
-                include_full_train=include_full_train,
-                focus_train_indices=focus_train_indices,
-                progress_callback=lambda stage, message: _set_prepare_status(status_key, stage, message, active=True),
-            )
+            _set_prepare_status(status_key, "checking_cache", "Checking train probe bundle cache", active=True)
+            cached = _find_cached_probe_payload(base_sample_id, train_sample_id, explicit_cache_path)
+            probe_cache_hit = cached is not None
+
+            if probe_cache_hit:
+                payload, cache_source = cached
+                print(f"[probe] sampleId={base_sample_id} trainSampleId={train_sample_id} cache={cache_source}", flush=True)
+                _set_prepare_status(status_key, "cache_hit", "Matching train probe bundle cache found", active=True)
+            else:
+                if CACHE_ONLY_MODE:
+                    # Building a probe always requires loading the model, and this
+                    # server is configured never to do that.
+                    message = (
+                        f"No precomputed train probe for {base_sample_id} / TRAIN #{train_sample_id}. "
+                        "This server has live model loading disabled (EIF_CACHE_ONLY=1); "
+                        "precompute the probe elsewhere and drop it into "
+                        f"ttav_bundles_real/{_stable_probe_sample_id(base_sample_id, train_sample_id)}/ first."
+                    )
+                    print(f"[probe] sampleId={base_sample_id} trainSampleId={train_sample_id} cache=miss (cache-only mode)", flush=True)
+                    _set_prepare_status(status_key, "error", message, active=False, error=True)
+                    self._send_json(404, {"status": "error", "message": message})
+                    return
+
+                _set_prepare_status(status_key, "building_probe", "Building train-sample embedding probe", active=True)
+                payload = build_train_probe_bundle_payload(
+                    report_json_path=str(report_json_path),
+                    model_path=model_path,
+                    train_sample_id=train_sample_id,
+                    probe_pairs=probe_pairs,
+                    sample_id=base_sample_id,
+                    embedding_type="contextual",
+                    hidden_layer=-1,
+                    vis_method=vis_method,
+                    vis_id=vis_id,
+                    context_radius=context_radius,
+                    include_full_train=include_full_train,
+                    focus_train_indices=focus_train_indices,
+                    progress_callback=lambda stage, message: _set_prepare_status(status_key, stage, message, active=True),
+                )
+
             payload["sample_id"] = probe_sample_id
             payload["vis_method"] = vis_method
             payload["vis_id"] = vis_id
             payload["overwrite"] = True
-            _set_prepare_status(status_key, "writing_local_cache", "Writing train probe bundle cache", active=True)
-            write_local_bundle_cache(probe_sample_id, payload, explicit_path=explicit_cache_path)
+            if not probe_cache_hit:
+                _set_prepare_status(status_key, "writing_local_cache", "Writing train probe bundle cache", active=True)
+                write_local_bundle_cache(probe_sample_id, payload, explicit_path=explicit_cache_path)
 
             upload_result = None
             upload_error = None
@@ -569,6 +619,7 @@ class TTAVBundleRequestHandler(BaseHTTPRequestHandler):
             "targetIndex": payload.get("target_index"),
             "promptLen": payload.get("bundle", {}).get("prompt_len", 0),
             "probeCachePath": explicit_cache_path,
+            "probeCacheHit": probe_cache_hit,
             "comparisonSummary": payload.get("comparison_summary"),
             "uploadResult": upload_result,
             "browserUploadRequired": browser_upload_required,

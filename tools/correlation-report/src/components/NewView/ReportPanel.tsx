@@ -419,6 +419,18 @@ interface TtavJumpPayload {
     // group — narrowing it would make each tick a different bundle to precompute,
     // so the filtering is a display concern on the other side.
     visiblePairIds?: string[];
+    // Each matched pair is two *edges* — one inside the train sample, one inside
+    // the test sample — plus the gradient similarity between them. cos_sim is the
+    // report's own verdict on the match and isn't in the bundle (pair_signature
+    // omits it), so it travels with the jump instead of forcing a regenerate.
+    probeEdges?: {
+        pairId: string;
+        cosSim: number;
+        trainSourceIndex: number;
+        trainTargetIndex: number;
+        testSourceIndex: number;
+        testTargetIndex: number;
+    }[];
 }
 
 interface TtavStaticBundlePayload {
@@ -1837,6 +1849,14 @@ export function ReportPanel({
                     targetIndex: typeof apiJson.targetIndex === 'number' ? apiJson.targetIndex : undefined,
                     promptLen: typeof apiJson.promptLen === 'number' ? apiJson.promptLen : 0,
                     visiblePairIds: selectedPairs.map(pair => pair.id),
+                    probeEdges: pairs.map(pair => ({
+                        pairId: pair.id,
+                        cosSim: pair.cos_sim,
+                        trainSourceIndex: pair.train_correlation.source_token_index,
+                        trainTargetIndex: pair.train_correlation.target_token_index,
+                        testSourceIndex: pair.test_correlation.source_token_index,
+                        testTargetIndex: pair.test_correlation.target_token_index,
+                    })),
                 };
 
                 navigateTtavWindow(openedWindow, payload);

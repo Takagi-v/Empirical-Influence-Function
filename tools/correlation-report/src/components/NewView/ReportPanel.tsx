@@ -414,6 +414,11 @@ interface TtavJumpPayload {
     targetIndex?: number;
     selectedSourceIndex?: number;
     promptLen: number;
+    // Probe launches only: which pairs the user ticked here, so the visualizer
+    // opens showing just those links. The bundle still carries every pair of the
+    // group — narrowing it would make each tick a different bundle to precompute,
+    // so the filtering is a display concern on the other side.
+    visiblePairIds?: string[];
 }
 
 interface TtavStaticBundlePayload {
@@ -1831,6 +1836,7 @@ export function ReportPanel({
                         : [],
                     targetIndex: typeof apiJson.targetIndex === 'number' ? apiJson.targetIndex : undefined,
                     promptLen: typeof apiJson.promptLen === 'number' ? apiJson.promptLen : 0,
+                    visiblePairIds: selectedPairs.map(pair => pair.id),
                 };
 
                 navigateTtavWindow(openedWindow, payload);

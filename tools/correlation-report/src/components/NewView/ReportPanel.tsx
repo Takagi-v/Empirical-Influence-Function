@@ -1119,7 +1119,11 @@ function TrainSampleGroup({
     const selectedPairIdSet = useMemo(() => new Set(selectedPairIds ?? []), [selectedPairIds]);
     const selectedPairCount = selectedPairIdSet.size;
     const comparisonTokens = comparisonSummary?.focusTokens ?? [];
-    const comparisonPairs = comparisonSummary?.pairwiseCosine ?? [];
+    // comparisonSummary.pairwiseCosine is intentionally not displayed: it measures
+    // token-to-token similarity *within the train sample*, which says nothing
+    // about whether a train↔test match is sound. Showing it next to the match
+    // invited reading it as the verdict — cos_sim is that, and it's already in the
+    // pair rows above. The field stays in the payload for other uses.
 
     return (
         <div className={styles.trainGroup}>
@@ -1166,7 +1170,7 @@ function TrainSampleGroup({
                     )}
                     {selectedPairCount > 0 && comparisonTokens.length > 0 && (
                         <div style={{ padding: '0 0 14px' }}>
-                            <div className={styles.subLabel}>已选 token（用于 probe 高亮与数值比较）</div>
+                            <div className={styles.subLabel}>已选 token（在 probe 中高亮）</div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                                 {comparisonTokens.map(token => (
                                     <span
@@ -1185,27 +1189,6 @@ function TrainSampleGroup({
                                     </span>
                                 ))}
                             </div>
-                            {comparisonPairs.length > 0 && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
-                                    {comparisonPairs.map(pair => (
-                                        <div
-                                            key={`${pair.leftIndex}-${pair.rightIndex}`}
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: 10,
-                                                fontSize: 12,
-                                                color: '#475569',
-                                            }}
-                                        >
-                                            <span style={{ fontFamily: 'monospace', color: '#7c2d12', minWidth: 200 }}>
-                                                {pair.leftTokenDisplay} @{pair.leftIndex} ↔ {pair.rightTokenDisplay} @{pair.rightIndex}
-                                            </span>
-                                            <span style={{ fontWeight: 700, color: '#b91c1c' }}>{pair.cosine.toFixed(4)}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     )}
                     <div className={styles.pairList}>

@@ -644,7 +644,12 @@ function inferSampleIdFromMeta(meta: AllTokensExperimentMeta, report?: AllTokens
     const match = fileStem.match(/^correlation_matching_results_(.+?)_all_tokens(?:_(.+))?$/);
     if (match) {
         const [, prefix, suffix] = match;
-        return suffix ? `${prefix}_${suffix}` : prefix;
+        // A trailing "salr5-8" records the attribution parameters, not which
+        // sample this is; the generator drops it when naming bundles, so keeping
+        // it would point every lookup at a directory that was never written.
+        // Other suffixes (e.g. "_new") do identify the sample and are kept.
+        if (!suffix || /^salr[\d-]+$/i.test(suffix)) return prefix;
+        return `${prefix}_${suffix}`;
     }
     // report.experiment_meta.task_id is model-agnostic (model lives separately in
     // model_name) — only safe to use as a last resort when the filename doesn't

@@ -191,45 +191,52 @@ def _make_probe_sample_id(
     return f"{base_sample_id}_train{train_sample_id}_probe_{digest}"
 
 
-def _probe_test_target_index(probe_pairs: list[dict]) -> int | None:
-    """The test token index a probe request is anchored on.
+def _probe_anchor_indices(probe_pairs: list[dict]) -> tuple[int | None, int | None]:
+    """The (test target, test source) edge a probe request is anchored on.
 
-    "Open Full Probe" lives inside one test-token group, so every pair it sends
-    shares a single testTargetIndex. That index is part of the precomputed
-    bundle's directory name, so we need it to find the file. If a caller ever
-    sends a mixed set we can't name it, so return None and let the lookup fall
-    back to the legacy name.
+    "Open Full Probe" sits inside one source→target edge of one test token, so
+    every pair it sends shares both indices. Both are part of the precomputed
+    bundle's directory name, so both are needed to find the file. A mixed set
+    can't be named, so that component comes back None and the lookup falls back
+    to a shorter, older name.
     """
-    indices = {
-        int(pair["testTargetIndex"])
-        for pair in probe_pairs
-        if isinstance(pair, dict) and pair.get("testTargetIndex") is not None
-    }
-    if len(indices) == 1:
-        return indices.pop()
-    return None
+    def sole(key: str) -> int | None:
+        values = {
+            int(pair[key])
+            for pair in probe_pairs
+            if isinstance(pair, dict) and pair.get(key) is not None
+        }
+        return values.pop() if len(values) == 1 else None
+
+    return sole("testTargetIndex"), sole("testSourceIndex")
 
 
 def _stable_probe_sample_id(
     base_sample_id: str,
     train_sample_id: int,
     test_target_index: int | None = None,
+    test_source_index: int | None = None,
 ) -> str:
     """Parameter-independent probe id, used to look up precomputed bundles.
 
     Precomputed probes are produced on another machine that can't reproduce this
     server's request-dependent hash, so they're stored under a name derived only
-    from (base sample, test target token, train sample) — the same id the
-    generator puts in the payload.
+    from the anchoring edge — the same id the generator puts in the payload, and
+    the same encoding the report uses for pair ids (`t136_s60_...`).
 
-    The `_t{index}` segment disambiguates the same train sample appearing under
-    several test-token groups; without it those probes would collide on one name.
-    Bundles generated before that segment existed used the shorter form, which is
-    what omitting test_target_index reproduces.
+    The naming has widened twice. `_t{target}` alone still lumped together every
+    source edge feeding one target token, which doesn't match what the button
+    actually launches; `_s{source}` splits those apart. Omitting either segment
+    reproduces an older form, kept only so existing bundles stay reachable.
     """
     if test_target_index is None:
         return f"{base_sample_id}_train{train_sample_id}_probe"
-    return f"{base_sample_id}_t{test_target_index}_train{train_sample_id}_probe"
+    if test_source_index is None:
+        return f"{base_sample_id}_t{test_target_index}_train{train_sample_id}_probe"
+    return (
+        f"{base_sample_id}_t{test_target_index}_s{test_source_index}"
+        f"_train{train_sample_id}_probe"
+    )
 
 
 def _default_probe_cache_path(base_sample_id: str, train_sample_id: int, probe_sample_id: str) -> str:
@@ -241,23 +248,32 @@ def _find_cached_probe_payload(
     train_sample_id: int,
     explicit_cache_path: str,
     test_target_index: int | None = None,
+    test_source_index: int | None = None,
 ) -> tuple[dict, str] | None:
-    """Look for an already-built probe bundle, newest-wins: this server's own
-    cache first, then a bundle precomputed elsewhere and dropped into
+    """Look for an already-built probe bundle, most-specific-first: this server's
+    own cache, then a bundle precomputed elsewhere and dropped into
     ttav_bundles_real/. Returns (payload, source) or None."""
     candidates = [
         (Path(explicit_cache_path) / "bundle_payload.json", "local_cache"),
     ]
+    if test_target_index is not None and test_source_index is not None:
+        candidates.append((
+            PREGENERATED_REAL_BUNDLE_ROOT
+            / _stable_probe_sample_id(base_sample_id, train_sample_id, test_target_index, test_source_index)
+            / "bundle_payload.json",
+            "pregenerated",
+        ))
+    # Older layouts, each a degraded match rather than an equal option: the
+    # _t-only form mixed every source edge under one target, and the form with
+    # neither segment also cut the test side down to the pairs' tokens ±1. Both
+    # are consulted only when nothing in the current format exists.
     if test_target_index is not None:
         candidates.append((
             PREGENERATED_REAL_BUNDLE_ROOT
             / _stable_probe_sample_id(base_sample_id, train_sample_id, test_target_index)
             / "bundle_payload.json",
-            "pregenerated",
+            "pregenerated_legacy_target_only",
         ))
-    # Probes generated before the _t{index} segment existed. Their test side only
-    # held the pairs' tokens ±1, so they're a degraded fallback, not an equal
-    # option — only consulted when no current-format bundle is present.
     candidates.append((
         PREGENERATED_REAL_BUNDLE_ROOT
         / _stable_probe_sample_id(base_sample_id, train_sample_id)
@@ -553,7 +569,7 @@ class TTAVBundleRequestHandler(BaseHTTPRequestHandler):
         ttav_url = str(req.get("ttavUrl", "")).strip()
         vis_method = str(req.get("visMethod", "TimeVis")).strip() or "TimeVis"
         vis_id = str(req.get("visId", "1")).strip() or "1"
-        test_target_index = _probe_test_target_index(probe_pairs)
+        test_target_index, test_source_index = _probe_anchor_indices(probe_pairs)
         probe_sample_id = _make_probe_sample_id(
             base_sample_id,
             train_sample_id,
@@ -577,6 +593,7 @@ class TTAVBundleRequestHandler(BaseHTTPRequestHandler):
                 train_sample_id,
                 explicit_cache_path,
                 test_target_index,
+                test_source_index,
             )
             probe_cache_hit = cached is not None
 
@@ -592,7 +609,7 @@ class TTAVBundleRequestHandler(BaseHTTPRequestHandler):
                         f"No precomputed train probe for {base_sample_id} / TRAIN #{train_sample_id}. "
                         "This server has live model loading disabled (EIF_CACHE_ONLY=1); "
                         "precompute the probe elsewhere and drop it into "
-                        f"ttav_bundles_real/{_stable_probe_sample_id(base_sample_id, train_sample_id, test_target_index)}/ first."
+                        f"ttav_bundles_real/{_stable_probe_sample_id(base_sample_id, train_sample_id, test_target_index, test_source_index)}/ first."
                     )
                     print(f"[probe] sampleId={base_sample_id} trainSampleId={train_sample_id} cache=miss (cache-only mode)", flush=True)
                     _set_prepare_status(status_key, "error", message, active=False, error=True)

@@ -12,6 +12,14 @@ DEFAULT_TTAV_UPLOAD_URL = "http://1.94.115.154/registerEIFBundle"
 _UMAP_MIN_POINTS = 6  # fall back to PCA for very small token sequences
 
 
+# Trailing tags that record how the attribution analysis was parameterised, not
+# which sample it is. They don't change the tokens or the embeddings, and the
+# generator strips them when naming bundles, so keeping them here would send
+# every lookup to a directory that doesn't exist. Other suffixes (e.g. `_new`)
+# do distinguish samples and are kept.
+_ANALYSIS_PARAM_SUFFIX = re.compile(r"^salr[\d\-]+$", re.IGNORECASE)
+
+
 def infer_sample_id(report_json_path: str) -> str:
     stem = os.path.splitext(os.path.basename(report_json_path))[0]
     match = re.match(r"^correlation_matching_results_(.+?)_all_tokens(?:_(.+))?$", stem)
@@ -19,7 +27,9 @@ def infer_sample_id(report_json_path: str) -> str:
         return stem
     prefix = match.group(1)
     suffix = match.group(2)
-    return f"{prefix}_{suffix}" if suffix else prefix
+    if not suffix or _ANALYSIS_PARAM_SUFFIX.match(suffix):
+        return prefix
+    return f"{prefix}_{suffix}"
 
 
 def decode_token(token: str) -> str:

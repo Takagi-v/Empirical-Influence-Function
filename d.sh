@@ -1,0 +1,28 @@
+torchrun --standalone --nproc_per_node=4 src/train/train.py \
+  --model_name_or_path /mnt/md124/jiaxin/models/Qwen3-8B \
+  --data_path /mnt/md124/jiaxin/training_code/data/train.jsonl \
+  --output_dir ./outputs/qwen3-8b-ce-only-annot-smoke \
+  --use_peft True \
+  --lora_r 16 --lora_alpha 32 --lora_dropout 0.05 \
+  --lora_target_modules q_proj,k_proj,v_proj,o_proj \
+  --loss_mode ce_saliency\
+  --num_train_epochs 20 \
+  --gradient_checkpointing True \
+  --ddp_find_unused_parameters False \
+  --enable_attn_viz False \
+  --eval_codebleu_samples 0 \
+  --per_device_train_batch_size 1 \
+  --gradient_accumulation_steps 4 \
+  --learning_rate 2e-5 \
+  --lr_scheduler_type cosine \
+  --warmup_ratio 0.03 \
+  --max_grad_norm 1.0 \
+  --max_len 1024 \
+  --bf16 True \
+  --use_flash_attention False \
+  --save_strategy steps --save_steps 5 --save_total_limit 2 \
+  --logging_steps 1 \
+  --dataloader_num_workers 2 \
+  --report_to none \
+  --run_name qwen3-8b-ce-only-annot-smoke \
+  --remove_unused_columns False

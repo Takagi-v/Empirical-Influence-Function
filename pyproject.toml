@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "empirical-influence-function"
+version = "0.1.0"
+description = "GraphSignal data curation, annotation, and saliency-aware code model training."
+requires-python = ">=3.11"
+readme = "README.md"
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = [
+  ".git",
+  ".micromamba",
+  ".venv",
+  "models",
+  "data",
+  "outputs",
+  "runs",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]

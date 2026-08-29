@@ -1,0 +1,5 @@
+input: /mnt/nvme0n1/wenhao/datasets/Empirical-Influence-Function/processed/train.compact.jsonl
+scores: outputs/baseline/xtf_scores.jsonl
+output: outputs/baseline/xtf.compact.jsonl
+pcp_threshold: 0.95
+tr_percentile: 10.0

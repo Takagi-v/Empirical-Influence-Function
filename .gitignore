@@ -1,0 +1,73 @@
+# =========================
+# Python cache
+# =========================
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# =========================
+# Local environments
+# =========================
+.venv/
+venv/
+env/
+.local/
+.micromamba/
+
+# =========================
+# Secrets / machine-local env
+# =========================
+.env
+.env.*
+!.env.example
+.envrc
+
+# 如果你决定提交 .envrc.example，保留即可
+!.envrc.example
+
+# =========================
+# Large data / models / outputs
+# =========================
+data/
+models/
+outputs/
+runs/
+checkpoints/
+**/checkpoint-*/
+
+# =========================
+# HuggingFace / experiment tools
+# =========================
+wandb/
+tensorboard/
+hf_cache/
+
+# =========================
+# Model weights
+# =========================
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+*.onnx
+
+# =========================
+# Logs / temp
+# =========================
+*.log
+*.tmp
+*.cache
+tmp/
+
+# others
+AGENTS.md
+data
+.micromamba
+runs
+models
+*.pdf
+.vscode
+.claude

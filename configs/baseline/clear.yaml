@@ -1,0 +1,6 @@
+input: /mnt/nvme0n1/wenhao/datasets/Empirical-Influence-Function/processed/train.compact.jsonl
+scores: outputs/baseline/clear_scores.jsonl
+output: outputs/baseline/clear.compact.jsonl
+gamma: 0.5
+eta: 0.8
+alpha: 0.5

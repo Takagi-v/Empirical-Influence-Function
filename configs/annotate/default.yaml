@@ -1,0 +1,11 @@
+model_path: /mnt/nvme0n1/wenhao/models/Empirical-Influence-Function/Qwen2.5-Coder-7B-Instruct
+annotate_model: ${ANNOTATE_MODEL}
+cache_dir: /mnt/nvme0n1/wenhao/hf_cache
+run_dir: /mnt/nvme0n1/wenhao/runs/Empirical-Influence-Function/annotate
+annotation_mode: agent
+num_workers: 4
+max_rounds: 3
+max_teacher_edges: 64
+request_timeout: 180
+max_retries: 3
+retry_base_sleep: 10

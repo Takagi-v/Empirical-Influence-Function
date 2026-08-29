@@ -1,0 +1,27 @@
+# Matched CE baseline for the infosel A/B on the new enterprise-Go FIM set (5k).
+# IDENTICAL recipe to lora_infosel_newgo5k_7b_s42 but token_select OFF, so it
+# trains on ALL completion tokens (plain CE on the same teacher-labeled rows).
+# The infosel-vs-this delta isolates the effect of dropping teacher missing-info tokens.
+# Eval via scripts/newgo_infosel/eval_newgo.py (AI4Go es/bleu/rougeL/acc).
+name: lora_ce_newgo5k_7b_s42
+description: >-
+  CE baseline (token_select OFF) on enterprise-Go FIM (5k). Plain CE-only LoRA on
+  Qwen2.5-Coder-7B-Instruct over the same teacher-labeled rows as lora_infosel_newgo5k_7b_s42.
+model: models/Qwen2.5-Coder-7B-Instruct
+
+data:
+  train: newgo_infosel_5k_tlabeled
+  token_select: {enabled: false, threshold: 2.0, keep_special: true}
+train:
+  loss_mode: ce_only
+  epochs: 1
+  lr: 2.0e-4
+  batch_size: 1
+  grad_accum: 8
+  max_len: 2048
+  seed: 42
+  lora: {r: 16, alpha: 32, dropout: 0.05}
+  save_total_limit: 1
+eval:
+  datasets: [newgo_nocontext]
+  num_samples: 1

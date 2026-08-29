@@ -1,0 +1,31 @@
+# TEMPORARY DEBUG — raw unannotated FIM → pure CE (no attention_edges).
+# Delete / ignore once proper compact annotated training data is restored.
+#
+#   python src/train/run_train.py --config configs/experiments/ce_only_raw_debug.yaml
+#
+# Or via torchrun / train_qwen8b.sh, add:
+#   --loss_mode ce_only
+#   --raw_prompt_response True
+#   --data_path .../cloud_core_test_25.JunJunly_GoOnly_length_filter.jsonl
+#   --raw_max_samples 5000   # optional; 0 = full ~200k (slow tokenize at load)
+name: ce_only_raw_debug
+model: models/Qwen2.5-Coder-7B-Instruct
+
+data:
+  raw_prompt_response: true
+  raw_path: cloud_core_test_25.JunJunly_GoOnly_length_filter.jsonl
+  # raw_max_samples: 5000   # uncomment for a quick smoke run
+
+train:
+  loss_mode: ce_only
+  epochs: 1
+  lr: 2.0e-4
+  batch_size: 1
+  grad_accum: 8
+  max_len: 2048
+  seed: 42
+  lora: {r: 16, alpha: 32, dropout: 0.05}
+  save_total_limit: 2
+  # EOS is already supervised on the raw path (response + eos_id in labels).
+  # supervise_eos: true
+  # eos_loss_weight: 3.0

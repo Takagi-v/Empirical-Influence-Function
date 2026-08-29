@@ -1,0 +1,4 @@
+input: /mnt/nvme0n1/wenhao/datasets/Empirical-Influence-Function/processed/train.compact.jsonl
+rewrites: outputs/baseline/llm_code_cleaning_rewrites.jsonl
+output: outputs/baseline/llm_code_cleaning.compact.jsonl
+rewrite_key: cleaned_response

@@ -1,0 +1,29 @@
+# Informative-token-selection on the new enterprise-Go FIM set (5k subsample).
+# CE-only LoRA on Qwen2.5-Coder-7B-Instruct over the teacher-labeled data,
+# EXCLUDING completion tokens the Qwen3-Coder-30B-A3B teacher scores as
+# "missing-info" (FIM NLL > 2.0). Matched A/B baseline = lora_ce_newgo5k_7b_s42
+# (SAME data, token_select OFF == plain CE).
+# Eval is done via the AI4Go metric harness (scripts/newgo_infosel/eval_newgo.py:
+# es/bleu/rougeL/acc), NOT the repo benchmark eval.
+name: lora_infosel_newgo5k_7b_s42
+description: >-
+  Informative-token selection (teacher=Qwen3-Coder-30B-A3B) on enterprise-Go FIM (5k).
+  CE-only LoRA on Qwen2.5-Coder-7B-Instruct EXCLUDING teacher missing-info tokens (FIM NLL>2.0).
+model: models/Qwen2.5-Coder-7B-Instruct
+
+data:
+  train: newgo_infosel_5k_tlabeled
+  token_select: {enabled: true, threshold: 2.0, keep_special: true}
+train:
+  loss_mode: ce_only
+  epochs: 1
+  lr: 2.0e-4
+  batch_size: 1
+  grad_accum: 8
+  max_len: 2048
+  seed: 42
+  lora: {r: 16, alpha: 32, dropout: 0.05}
+  save_total_limit: 1
+eval:
+  datasets: [newgo_nocontext]
+  num_samples: 1

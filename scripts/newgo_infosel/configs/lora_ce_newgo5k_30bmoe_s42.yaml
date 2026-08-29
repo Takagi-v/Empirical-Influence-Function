@@ -1,0 +1,25 @@
+# Matched CE baseline for the 30B-A3B MoE infosel A/B (token_select OFF = plain CE).
+# IDENTICAL recipe to lora_infosel_newgo5k_30bmoe_s42, only token_select disabled.
+name: lora_ce_newgo5k_30bmoe_s42
+description: >-
+  CE baseline (token_select OFF) on enterprise-Go FIM (5k), Qwen3-Coder-30B-A3B MoE target,
+  attention-only LoRA sharded via device_map=auto.
+model: models/Qwen3-Coder-30B-A3B-Instruct
+
+data:
+  train: newgo_infosel_5k_30bmoe_tlabeled
+  token_select: {enabled: false, threshold: 2.0, keep_special: true}
+train:
+  loss_mode: ce_only
+  epochs: 1
+  lr: 1.0e-4
+  batch_size: 1
+  grad_accum: 16
+  max_len: 2048
+  seed: 42
+  gradient_checkpointing: true
+  device_map: auto
+  lora: {r: 16, alpha: 32, dropout: 0.05, target_modules: [q_proj, k_proj, v_proj, o_proj]}
+eval:
+  datasets: [newgo_nocontext]
+  num_samples: 1

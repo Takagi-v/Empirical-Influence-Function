@@ -1,0 +1,31 @@
+# Example: CE (+ optional saliency) with annotation-gated token skip.
+# Drop completion tokens that are NOT annotation destinations, except:
+#   - first 2 completion tokens (positions 0, 1)
+#   - keyword / punct/op / whitespace
+#   - special tokens (EOS / role markers)
+#
+# Does NOT use a teacher model. Requires compact data with attention_edges.
+# Keep saliency_agg at default "last" (do not set rollout unless you want the slow path).
+name: ce_annot_skip_example
+model: models/Qwen2.5-Coder-7B-Instruct
+
+data:
+  train: csn_train_10k   # registry key; must be compact + annotated
+  annot_skip:
+    enabled: true
+    keep_first: 2
+    keep_special: true
+
+train:
+  loss_mode: ce_only     # or ce_saliency (with saliency.agg: last)
+  epochs: 1
+  lr: 2.0e-4
+  batch_size: 1
+  grad_accum: 8
+  max_len: 2048
+  seed: 42
+  lora: {r: 16, alpha: 32, dropout: 0.05}
+  # saliency:            # only if loss_mode uses saliency
+  #   loss_type: contrastive
+  #   lambda: 1.5
+  #   agg: last          # default; omit rollout

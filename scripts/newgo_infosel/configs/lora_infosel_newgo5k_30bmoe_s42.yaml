@@ -1,0 +1,36 @@
+# Informative-token-selection on enterprise-Go FIM (5k), 30B-A3B MoE TARGET.
+# LoRA is ATTENTION-ONLY (target_modules q/k/v/o_proj) so it is NOT attached to
+# every MoE expert; the 30B base is SHARDED across all visible GPUs via
+# device_map=auto (naive model parallelism, single process) — built for an
+# 8x~70GB machine. Matched CE baseline: lora_ce_newgo5k_30bmoe_s42.
+#
+# IMPORTANT: data.train (newgo_infosel_5k_30bmoe_tlabeled) MUST be built + labeled
+# with the 30B tokenizer. See README "Fine-tuning a 30B-A3B MoE on 8 GPUs".
+name: lora_infosel_newgo5k_30bmoe_s42
+description: >-
+  Informative-token selection on enterprise-Go FIM (5k), Qwen3-Coder-30B-A3B MoE target,
+  attention-only LoRA sharded via device_map=auto. Excludes teacher missing-info tokens (FIM NLL>2.0).
+model: models/Qwen3-Coder-30B-A3B-Instruct
+
+data:
+  train: newgo_infosel_5k_30bmoe_tlabeled
+  token_select: {enabled: true, threshold: 2.0, keep_special: true}
+train:
+  loss_mode: ce_only
+  epochs: 1
+  lr: 1.0e-4
+  batch_size: 1
+  grad_accum: 16
+  max_len: 2048
+  seed: 42
+  gradient_checkpointing: true
+  # Naive model-parallel: shard the 30B across all visible GPUs (single process).
+  # For faster data-parallel + sharding instead, DROP device_map and set:
+  #   nproc_per_node: 8
+  #   fsdp: "full_shard auto_wrap"
+  #   fsdp_wrap: Qwen3MoeDecoderLayer
+  device_map: auto
+  lora: {r: 16, alpha: 32, dropout: 0.05, target_modules: [q_proj, k_proj, v_proj, o_proj]}
+eval:
+  datasets: [newgo_nocontext]
+  num_samples: 1

@@ -1,0 +1,16 @@
+# Human-maintained training dependencies.
+# Full environment freeze is stored in locks/train.freeze.txt.
+torch>=2.5
+transformers>=4.43
+accelerate
+peft
+# Use deepspeed when distributed training needs ZeRO/offload.
+deepspeed
+flash-attn
+wandb
+datasets
+numpy
+matplotlib
+tqdm
+safetensors
+einops

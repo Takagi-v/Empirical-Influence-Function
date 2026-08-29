@@ -1,0 +1,10 @@
+# Minimal dependencies for ChatML/FIM annotation only.
+# This does not include training, evaluation, visualization, or model-loading stacks.
+openai>=1.0.0
+httpx
+transformers>=4.43.0
+tokenizers
+tqdm
+tree_sitter
+tree_sitter_go
+tree_sitter_java

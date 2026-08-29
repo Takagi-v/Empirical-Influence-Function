@@ -1,0 +1,12 @@
+input: /mnt/nvme0n1/wenhao/datasets/Empirical-Influence-Function/raw/input.jsonl
+output_dir: /mnt/nvme0n1/wenhao/datasets/Empirical-Influence-Function/processed
+interim_dir: /mnt/nvme0n1/wenhao/datasets/Empirical-Influence-Function/interim
+run_name: fim_annotation_data
+language: auto
+max_accepted_rows: 0
+strip_cjk_comments: false
+max_target_nonempty_lines: 10
+max_target_rough_tokens: 192
+max_target_chars: 1024
+filter_gofmt_valid: false
+skip_annotation: false

@@ -1,0 +1,4 @@
+input: /mnt/nvme0n1/wenhao/datasets/Empirical-Influence-Function/processed/train.compact.jsonl
+scores: outputs/baseline/token_cleaning_scores.jsonl
+output: outputs/baseline/token_cleaning.compact.jsonl
+keep_ratio: 0.6

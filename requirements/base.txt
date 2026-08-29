@@ -1,0 +1,7 @@
+# Runtime utilities shared by data processing, annotation, and baseline scripts.
+numpy
+pandas
+pyyaml
+tqdm
+rich
+requests

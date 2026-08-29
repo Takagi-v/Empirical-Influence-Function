@@ -1,0 +1,11 @@
+model: /mnt/nvme0n1/wenhao/models/Empirical-Influence-Function/Qwen2.5-Coder-1.5B-Instruct
+data: /mnt/nvme0n1/wenhao/datasets/Empirical-Influence-Function/processed/go_singleline_fim_exp/train_data/go_single_train_v2_graphsignal_10k_compact.json
+output: outputs/train/default
+run_dir: /mnt/nvme0n1/wenhao/runs/Empirical-Influence-Function
+hf_home: /mnt/nvme0n1/wenhao/hf_cache
+language: Go
+loss_mode: ce_saliency
+num_train_epochs: 30
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 4
+learning_rate: 2.0e-5
